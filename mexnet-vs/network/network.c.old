@@ -1,0 +1,496 @@
+// network.c : Defines the exported functions for the DLL application.
+//
+
+#include "stdafx.h"
+#include "network.h"
+
+#define MAX_NETWORKS (10)
+#define NETWORK_VALID(id) (((id) >= 0) && ((id) < MAX_NETWORKS) && networks[id].active)
+#define NODE_VALID(net,id) (((id) >= 0) && ((id) < (net).nNodes) && ((net).nodes[id].inUse))
+
+DEF_ARRAY_INDEX_OF(nodePtr, Node *) // define an arrayIndexOf function to work on Node ptrs
+
+#define DEF_STACK_STRUCT(type) struct { type *arr; size_t top; }
+
+typedef DEF_STACK_STRUCT(size_t) IndexStack;
+
+#define STACK_ALLOC(stack, size) { (stack).arr = mxMalloc( sizeof(*(stack).arr)*(size) ); }
+
+#define STACK_FREE(stack) { mxFree((stack).arr); }
+
+#define STACK_PUSH(stack, val) { (stack).arr[(stack).top++] = (val); }
+
+#define STACK_PUSH_ALL(stack, vals, n) { size_t i; for(i = 0; i < (n); i++) (stack).arr[(stack).top++] = (vals[i]); }
+
+#define STACK_POP(stack) (stack).arr[--((stack).top)]
+
+#define STACK_IS_EMPTY(stack) ( (stack).top == 0 )
+
+Network networks[MAX_NETWORKS];
+
+IndexStack transact(Network net, Node* node, SQ_NODE_DATA_TYPE *value);
+
+NETWORK_API int sqCreateNetwork(size_t size, mxArray *deleteCallback)
+{
+	int idx = nextFreeNetwork();
+	if (idx >= 0) {
+		networks[idx] = (const Network){ 0 }; // re-initialise network
+		networks[idx].nodes = mxCalloc(size, sizeof(Node)); //alloc memory for size nodes
+		mexMakeMemoryPersistent(networks[idx].nodes); //ensure the memory will persist
+		networks[idx].nNodes = size; // record the number of nodes in our network
+		networks[idx].deleteCallback = deleteCallback;
+		networks[idx].active = TRUE;
+	}
+	return idx;
+}
+
+NETWORK_API void sqDeleteNetwork(int net)
+{
+	if (NETWORK_VALID(net)) {
+		Network network = networks[net];
+		int i;
+		mexPrintf("Deleting net(%d)\n", net);
+		if (network.deleteCallback) {
+			mexCallMATLABWithTrap(0, NULL, 1, &network.deleteCallback, "apply");
+			mxDestroyArray(network.deleteCallback);
+		}
+		for (i = 0; i < network.nNodes; i++) {
+			if (network.nodes[i].inUse)
+				cleanupNode(&network.nodes[i]);
+		}
+		mxFree(network.nodes); // clean up array of nodes
+		networks[net] = (const Network){ 0 }; // clear network info
+	}
+	else {
+		mexPrintf("%d is not a valid network id\n", net);
+	}
+}
+
+NETWORK_API void sqDeleteNetworks(void) {
+	int i;
+	for (i = 0; i < MAX_NETWORKS; i++) {
+		if (NETWORK_VALID(i))
+			sqDeleteNetwork(i);
+	}
+}
+
+NETWORK_API size_t sqAddNode(int net, size_t inputs[], size_t nInputs, Transferer transferer)
+{
+	if (NETWORK_VALID(net)) {
+		size_t nodeidx = nextFreeNode(net);
+		// bit ugly doing this one bit here rather than where the rest its args are initialised
+		transferer.args[2] = mxCreateDoubleScalar((double)nodeidx);
+		mexMakeArrayPersistent(transferer.args[2]);
+		if (nodeidx >= 0) {
+			Node *n = &networks[net].nodes[nodeidx];
+			/*mxArray *mxInputIdxs = mxCreateDoubleMatrix(nInputs, 1, mxREAL);
+			double *dInputIdxs = mxGetPr(mxInputIdxs);
+			mexMakeArrayPersistent(mxInputIdxs);
+			for (i = 0; i < nInputs; i++)
+			dInputIdxs[i] = (double)inputs[i];*/
+
+			n->id = nodeidx;
+			// TODO: handle allocation fails etc
+			n->inputs = nodePtrs(networks[net].nodes, inputs, nInputs);
+			n->nInputs = nInputs;
+			n->nTargets = 0;
+			n->targets = mxMalloc(0); // 'dummy' targets array
+			n->transferer = transferer;
+			n->inUse = TRUE;
+			addTarget(n->inputs, nInputs, n);
+			return nodeidx;
+		}
+	}
+	return -1;
+}
+
+NETWORK_API void sqDeleteNode(int net, size_t node)
+{
+	if (!NETWORK_VALID(net)) {
+		mexPrintf("%d is not a valid network id\n", net);
+	}
+	else if (!NODE_VALID(networks[net], node)) {
+		mexPrintf("%d is not a valid node id\n", node);
+	}
+	else {
+		cleanupNode(&networks[net].nodes[node]);
+	}
+}
+
+NETWORK_API void sqSetNodeCurrValue(int net, size_t node, SQ_NODE_DATA_TYPE *value)
+{
+	if (!NETWORK_VALID(net)) {
+		mexPrintf("%d is not a valid network id\n", net);
+	}
+	else if (!NODE_VALID(networks[net], node)) {
+		mexPrintf("%d is not a valid node id\n", node);
+	}
+	else {
+		setNodeCurrValue(&networks[net].nodes[node], value);
+	}
+}
+
+NETWORK_API SQ_NODE_DATA_TYPE *sqGetNodeCurrValue(int net, size_t node)
+{
+	if (!NETWORK_VALID(net)) {
+		mexPrintf("%d is not a valid network id\n", net);
+	}
+	else if (!NODE_VALID(networks[net], node)) {
+		mexPrintf("%d is not a valid node id\n", node);
+	}
+	else {
+		return networks[net].nodes[node].currValue;
+	}
+	return (SQ_NODE_DATA_TYPE *)NULL;
+}
+
+NETWORK_API void sqSetNodeWorkingValue(int net, size_t node, SQ_NODE_DATA_TYPE *value)
+{
+	if (!NETWORK_VALID(net)) {
+		mexPrintf("%d is not a valid network id\n", net);
+	}
+	else if (!NODE_VALID(networks[net], node)) {
+		mexPrintf("%d is not a valid node id\n", node);
+	}
+	else {
+		setNodeWorkingValue(&networks[net].nodes[node], value);
+	}
+}
+
+NETWORK_API SQ_NODE_DATA_TYPE *sqGetNodeWorkingValue(int net, size_t node)
+{
+	if (!NETWORK_VALID(net)) {
+		mexPrintf("%d is not a valid network id\n", net);
+	}
+	else if (!NODE_VALID(networks[net], node)) {
+		mexPrintf("%d is not a valid node id\n", node);
+	}
+	else {
+		return networks[net].nodes[node].workingValue;
+	}
+	return (SQ_NODE_DATA_TYPE *)NULL;
+}
+
+NETWORK_API BOOL sqIsNetwork(int net) {
+	return NETWORK_VALID(net);
+}
+
+NETWORK_API BOOL sqIsNode(int net, size_t node) {
+	return NODE_VALID(networks[net], node);
+}
+
+NETWORK_API void sqDispNetwork(int net) {
+	if (NETWORK_VALID(net)) {
+		size_t nNodes = numActiveNodes(networks[net]);
+		mexPrintf("Net %d with %d/%d active nodes\n", net, nNodes, networks[net].nNodes);
+	}
+	else {
+		mexPrintf("%d is not a valid network id\n", net);
+	}
+}
+
+NETWORK_API void sqDispNode(int net, size_t node) {
+	if (!NETWORK_VALID(net)) {
+		mexPrintf("%d is not a valid network id\n", net);
+	}
+	else if (!NODE_VALID(networks[net], node)) {
+		mexPrintf("%d is not a valid node id\n", node);
+	}
+	else
+	{
+		Node* n = &networks[net].nodes[node];
+		mxArray *v = n->currValue;
+		char* valstr;
+		// print id
+		mexPrintf("{#%d,value:", n->id);
+		// print current value
+		if (v) {
+			mxArray *lhs;
+			mexCallMATLAB(1, &lhs, 1, &v, "mat2str");
+			valstr = mxArrayToString(lhs);
+			mexPrintf("%s", valstr);
+			mxFree(valstr);
+		}
+		else {
+			mexPrintf("NULL");
+		}
+		mexPrintf(",inputs:[");
+		printNodeIds(n->inputs, n->nInputs);
+
+		mexPrintf("],targets:[");
+		printNodeIds(n->targets, n->nTargets);
+		mexPrintf("],transferer{funName:@%s,opCode:%d}}\n", n->transferer.funName, n->transferer.opCode);
+	}
+}
+
+NETWORK_API mxArray *sqTransact(int net, size_t node, SQ_NODE_DATA_TYPE *value) {
+	if (!NETWORK_VALID(net)) {
+		mexPrintf("%d is not a valid network id\n", net);
+		return NULL;
+	}
+	else if (!NODE_VALID(networks[net], node)) {
+		mexPrintf("%d is not a valid node id\n", node);
+		return NULL;
+	}
+	else
+	{
+		IndexStack updates = transact(networks[net], &networks[net].nodes[node], value);
+		mxArray *updatesmxArr = mxCreateDoubleMatrix(updates.top, 1, mxREAL);
+		double *updatesArr = mxGetPr(updatesmxArr) + updates.top;
+		while (!STACK_IS_EMPTY(updates))
+			*(--updatesArr) = (double)STACK_POP(updates);
+		STACK_FREE(updates);
+		return updatesmxArr;
+	}
+}
+
+NETWORK_API mxArray *sqApply(int net, const mxArray *updatedNodes) {
+	if (!NETWORK_VALID(net)) {
+		mexPrintf("%d is not a valid network id\n", net);
+		return NULL;
+	}
+	else {
+		Node *nodes = networks[net].nodes; // all the network's nodes
+		// flags indicating whether a node's changes were already applied
+		char *wasApplied = mxCalloc(sizeof(char), networks[net].nNodes);
+		size_t i, nUpdates = mxGetNumberOfElements(updatedNodes), nApplied;
+		double *dUpdatedNodes = mxGetPr(updatedNodes), *dAppliedSet;
+		IndexStack appliedSet = { 0 }; // set of all nodes that have had changes applied
+		mxArray *appliedmxSet;
+
+		STACK_ALLOC(appliedSet, nUpdates); // appliedSet will never be larger than nUpdates
+		
+		// iterate over list of updates, applying to a node only once
+		//mexPrintf("Applying..");
+		for (i = 0; i < nUpdates; i++) {
+			size_t currNode = (size_t)dUpdatedNodes[i];
+			if (!NODE_VALID(networks[net], currNode)) {
+				mexPrintf("Invalid node #%d.\n", currNode);
+				continue;
+			}
+			if (!wasApplied[currNode]) {
+				mxArray *v = mxDuplicateArray(nodes[currNode].workingValue);
+				//mexPrintf(" #%d", nodes[currNode].id);
+				setNodeCurrValue(&nodes[currNode], v);
+				mexMakeArrayPersistent(v);
+				setNodeWorkingValue(&nodes[currNode], (mxArray *)NULL);
+				STACK_PUSH(appliedSet, currNode);
+				wasApplied[currNode] = true;
+			}
+		}
+		//mexPrintf("\n");
+		mxFree(wasApplied); // finished with the node applied record
+
+		// turn the applied set stack into a double mxArray to return
+		nApplied = appliedSet.top;
+		appliedmxSet = mxCreateDoubleMatrix(nApplied, 1, mxREAL);
+		dAppliedSet = mxGetPr(appliedmxSet) + nApplied;
+		while (!STACK_IS_EMPTY(appliedSet))
+			*(--dAppliedSet) = (double)STACK_POP(appliedSet);
+		STACK_FREE(appliedSet);
+
+		return appliedmxSet;
+	}
+}
+
+void printNodeIds(Node **nodes, size_t n) {
+	size_t j;
+	for (j = 0; j < n; j++) {
+		if (j > 0)
+			mexPrintf(",");
+		mexPrintf("%d", nodes[j]->id);
+	}
+}
+
+void cleanupNode(Node *n) {
+	size_t i;
+	mexPrintf("Deleting #%d\n", n->id);
+	// remove node from targets of all inputs
+	removeTarget(n->inputs, n->nInputs, n);
+	// remove node inputs of all targets
+	removeInput(n->targets, n->nTargets, n);
+	// free arrays of pointers to inputs, and targets
+	mxFree(n->inputs);
+	mxFree(n->targets);
+	// free transfer data
+	mxFree(n->transferer.funName);
+	for (i = 0; i < NUMEL(n->transferer.args); i++)
+		mxDestroyArray(n->transferer.args[i]);
+	// free the data values
+	if (n->currValue) {
+		mxDestroyArray(n->currValue);
+	}
+	if (n->workingValue) {
+		mxDestroyArray(n->workingValue);
+	}
+	// clear all node data for safety
+	*n = (const Node){ 0 };
+}
+
+size_t numActiveNodes(Network net) {
+	int i, count = 0;
+	for (i = 0; i < net.nNodes; i++) {
+		if (net.nodes[i].inUse) {
+			count++;
+		}
+	}
+	return count;
+}
+
+Node **nodePtrs(Node from[], size_t idxs[], size_t n) {
+	Node **ptrs = mxMalloc(n*sizeof(Node*));
+	size_t i;
+	for (i = 0; i < n; i++) {
+		size_t idx = idxs[i];
+		// todo: ensure idx >= 0 && id < net.nNodes && net.nodes[id].inUse
+		ptrs[i] = &from[idx];
+	}
+	mexMakeMemoryPersistent(ptrs);
+	return ptrs;
+}
+
+void setNodeCurrValue(Node *n, SQ_NODE_DATA_TYPE *value) {
+	if (n->currValue) { // free existing value
+		mxDestroyArray(n->currValue);
+	}
+	n->currValue = value;
+}
+
+void setNodeWorkingValue(Node *n, SQ_NODE_DATA_TYPE *value) {
+	if (n->workingValue) { // free existing value
+		mxDestroyArray(n->workingValue);
+	}
+	n->workingValue = value;
+}
+
+void addTarget(Node *sources[], size_t nSources, Node *target) {
+	size_t i;
+	for (i = 0; i < nSources; i++) {
+		Node* src = sources[i];
+		arrayAppend((void**)&src->targets, &src->nTargets, &target, sizeof(target));
+		mexPrintf("(%d)updated targets of input node[%d] (id#%d=%d)\n", i, src->id, target->id,
+			src->targets[src->nTargets - 1]->id);
+	}
+	return;
+}
+
+void removeTarget(Node *sources[], size_t nSources, Node *target) {
+	int i;
+	for (i = 0; i < nSources; i++) { // iterate the sources, remove target from each
+		Node* src = sources[i];
+		long targetIdx = nodePtrArrayIndexOf(src->targets, src->nTargets, target);
+		mexPrintf("Removing target #%d from #%d\n", target->id, src->id);
+		arrayRemove((void**)&src->targets, &src->nTargets, targetIdx, sizeof(target));
+	}
+	return;
+}
+
+void removeInput(Node *targets[], size_t nSources, Node *input) {
+	int i;
+	for (i = 0; i < nSources; i++) { // iterate the sources, remove target from each
+		Node* target = targets[i];
+		long inputIdx = nodePtrArrayIndexOf(target->inputs, target->nInputs, input);
+		mexPrintf("Warning: removing input #%d from #%d\n", input->id, target->id);
+		arrayRemove((void**)&target->inputs, &target->nInputs, inputIdx, sizeof(input));
+	}
+	return;
+}
+
+void arrayAppend(void **srcPtr, size_t *nElemPtr, void *extraElem, size_t elemSize) {
+	// reallocate with space for one element more
+	*srcPtr = mxRealloc(*srcPtr, (*nElemPtr + 1)*elemSize);
+	mexMakeMemoryPersistent(*srcPtr); // ensure it's persistent
+	// copy the extra element into the final element of the new array
+	memcpy((char*)(*srcPtr) + (*nElemPtr*elemSize), extraElem, elemSize);
+	(*nElemPtr)++; // increement the element count
+}
+
+void arrayRemove(void **srcPtr, size_t *nElemPtr, size_t elemIdx, size_t elemSize) {
+	char *src = (char *)*srcPtr; // source array cast as sizeof == 1 type
+	void *dst = mxMalloc((*nElemPtr - 1)*elemSize); // allocate smaller by one array
+	// copy the elements upto the removed element
+	memcpy(dst, src, elemIdx*elemSize);
+	// copy the elements from after the removed element
+	memcpy(
+		((char *)dst) + elemIdx*elemSize, // destination starting from vacated stlot
+		src + (elemIdx + 1)*elemSize,	// src from the element after removed
+		(*nElemPtr - elemIdx - 1)*elemSize); // # of elements after removed
+	mexMakeMemoryPersistent(dst); //make new array persistent
+	(*nElemPtr)--; // decrease the element count pointer
+	*srcPtr = dst; // update ptr to new array
+	mxFree(src); // free the original array
+}
+
+int nextFreeNetwork() {
+	int i;
+
+	for (i = 0; i < MAX_NETWORKS; i++) {
+		if (!networks[i].active) return i;
+	}
+	return -1;
+}
+
+size_t nextFreeNode(int net) {
+	size_t i, nNodes = networks[net].nNodes;
+	Node *nodes = networks[net].nodes;
+
+	for (i = 0; i < nNodes; i++) {
+		if (!nodes[i].inUse) return i;
+	}
+	return -1;
+}
+
+BOOL anyNetworksActive() {
+	int i;
+	for (i = 0; i < MAX_NETWORKS; i++) {
+		if (networks[i].active) return TRUE;
+	}
+	return FALSE;
+}
+
+IndexStack transact(Network net, Node* node, SQ_NODE_DATA_TYPE *value) {
+	Node *nodes = net.nodes;
+	DEF_STACK_STRUCT(Node *) todo = { 0 };
+	IndexStack updates = { 0 };
+	STACK_ALLOC(todo, net.nNodes); // TODO: stack size is unsafe
+	STACK_ALLOC(updates, net.nNodes); // TODO: stack size is unsafe
+
+	//mexPrintf("transact begin on node #%d\n", node->id);
+
+	setNodeWorkingValue(node, value); // update the working value of starting node
+	STACK_PUSH_ALL(todo, node->targets, node->nTargets); // starting node's targets need recomputing
+	STACK_PUSH(updates, node->id); // add starting node to updates list
+	//mexPrintf("#%d's output changed\n", node->id);
+	while (!STACK_IS_EMPTY(todo)) {
+		Node* curr = STACK_POP(todo); // next node to process
+		BOOL changed;
+		//mexPrintf("top of while working node #%d\n", curr->id);
+		changed = transfer(curr); // compute value from inputs
+		//mexPrintf("output changed = %d\n", changed);
+		if (changed) { // if output of current node changed
+			// push all its target nodes onto the list
+			STACK_PUSH_ALL(todo, curr->targets, curr->nTargets);
+			// add to set of changed nodes, if not already
+			//mexPrintf("#%d's output changed\n", curr->id);
+			STACK_PUSH(updates, curr->id);
+		}
+	}
+	STACK_FREE(todo); // done with node transfer todo list
+	return updates; // return the list of updated node indices
+}
+
+BOOL transfer(Node* node) {
+	Transferer trans = node->transferer;
+	mxArray *lhs[1];
+	BOOL changed = false;
+
+	/*rhs[0] = mxCreateDoubleScalar((double)net);
+	rhs[1] = node->inputIdx;
+	rhs[2] = mxCreateDoubleScalar((double)node->id);
+	rhs[3] = trans.arg;*/
+	//mexPrintf("dummy call %s\n", trans.funName);
+	mexCallMATLAB(1, lhs, 4, trans.args, trans.funName);
+	changed = mxIsLogicalScalarTrue(lhs[0]);
+	mxDestroyArray(lhs[0]);
+	return changed;
+}
