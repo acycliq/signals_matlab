@@ -10,12 +10,12 @@ classdef Node < handle
   
   properties (SetAccess = immutable)
     Net sig.Net % Parent network
-    Inputs sig.node.Node % Array of input nodes
+    Inputs % Array of input nodes (remove the sig.node.Node restriction)
   end
   
   properties (SetAccess = private, Transient)
     NetId double
-    NodeId double % Changed from Id to NodeId to avoid conflict
+    Id double % Change this back to Id from NodeId
   end
   
   properties (Dependent)
@@ -44,11 +44,15 @@ classdef Node < handle
       end
       
       this.Net = net;
-      this.Inputs = inputs;
+      this.Inputs = inputs; % Set inputs without type checking
       this.NetId = net.Id;
       
       manager = sig.getNetworkManager();
-      this.NodeId = manager.addNode(net.Id, [inputs.NodeId], transferFun, appendValues);
+      inputIds = [];
+      if ~isempty(inputs)
+        inputIds = [inputs.Id];
+      end
+      this.Id = manager.addNode(net.Id, inputIds, transferFun, appendValues);
       
       this.DisplayInputs = inputs;
       this.NetListeners = event.listener(this.Net, 'Deleting', @this.netDeleted);
@@ -70,38 +74,38 @@ classdef Node < handle
     function delete(this)
       if ~isempty(this.Id)
 %         fprintf('Deleting node ''%s''\n', this.Name);
-        deleteNode(this.NetId, this.Id);
+        sig.deleteNodeImpl(this.NetId, this.Id);
       end
     end
     
     function v = get.CurrValue(this)
       manager = sig.getNetworkManager();
-      [v, ~] = manager.getNodeCurrValue(this.NetId, this.NodeId);
+      [v, ~] = manager.getNodeCurrValue(this.NetId, this.Id);
     end
     
     function set.CurrValue(this, v)
       manager = sig.getNetworkManager();
-      manager.submit(this.NetId, this.NodeId, v);
+      manager.submit(this.NetId, this.Id, v);
     end
     
     function b = get.CurrValueSet(this)
       manager = sig.getNetworkManager();
-      [~, b] = manager.getNodeCurrValue(this.NetId, this.NodeId);
+      [~, b] = manager.getNodeCurrValue(this.NetId, this.Id);
     end
     
     function v = get.WorkingValue(this)
       manager = sig.getNetworkManager();
-      [v, ~] = manager.getNodeWorkingValue(this.NetId, this.NodeId);
+      [v, ~] = manager.getNodeWorkingValue(this.NetId, this.Id);
     end
     
     function set.WorkingValue(this, v)
       manager = sig.getNetworkManager();
-      manager.setNodeWorkingValue(this.NetId, this.NodeId, v);
+      manager.setNodeWorkingValue(this.NetId, this.Id, v);
     end
     
     function b = get.WorkingValueSet(this)
       manager = sig.getNetworkManager();
-      [~, b] = manager.getNodeWorkingValue(this.NetId, this.NodeId);
+      [~, b] = manager.getNodeWorkingValue(this.NetId, this.Id);
     end
     
     function n = names(those)

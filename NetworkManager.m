@@ -14,7 +14,7 @@ classdef NetworkManager < handle
             if isempty(netId)
                 error('Maximum number of networks reached');
             end
-            obj.networks{netId} = struct('nodes', cell(1, size), 'nNodes', size, 'active', true, 'deleteCallback', []);
+            obj.networks{netId} = struct('nodes', {cell(1, size)}, 'nNodes', size, 'active', true, 'deleteCallback', []);
         end
         
         function deleteNetwork(obj, netId)
@@ -34,7 +34,10 @@ classdef NetworkManager < handle
             if isempty(nodeId)
                 error('Maximum number of nodes reached for this network');
             end
-            network.nodes{nodeId} = struct('inputs', inputs, 'transferFun', transferFun, 'appendValues', appendValues, 'workingValue', [], 'currValue', []);
+            if isempty(inputs)
+                inputs = [];
+            end
+            network.nodes{nodeId} = struct('id', nodeId, 'inputs', inputs, 'transferFun', transferFun, 'appendValues', appendValues, 'workingValue', [], 'currValue', []);
         end
         
         function applyNodes(obj, netId, nodeIds)

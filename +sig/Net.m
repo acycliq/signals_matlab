@@ -182,14 +182,6 @@ classdef Net < handle
     end
     
     function n = rootNode(this, name)
-    % Create a new node with a specified name
-    %  The name of a node is usually a string representation of its
-    %  transfer function (the FormatSpec), however some nodes (i.e. ones
-    %  that simply hold a value, such a seed), have no transfer function.
-    %  This function allows one to create such a node.  If the name is not
-    %  specified, the node's id is used instead.
-    %
-    % See also sig.node.Node
       n = sig.node.Node(this);
       if nargin < 2
         n.Name = sprintf('n%i', n.Id);

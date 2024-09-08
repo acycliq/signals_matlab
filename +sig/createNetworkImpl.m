@@ -11,10 +11,8 @@ function networkId = createNetworkImpl(size, deleteCallback)
     end
     
     % Set up cleanup on MATLAB exit
-    persistent isExitFunctionSet
-    if isempty(isExitFunctionSet)
-        exitFunc = @() manager.deleteAllNetworks();
-        matlab.unittest.fixtures.GlobalFixture.setFixture(matlab.unittest.fixtures.ExitFixture(exitFunc));
-        isExitFunctionSet = true;
+    persistent cleanupObj
+    if isempty(cleanupObj)
+        cleanupObj = onCleanup(@() manager.deleteAllNetworks());
     end
 end
