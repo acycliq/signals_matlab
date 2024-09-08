@@ -56,7 +56,7 @@ classdef Net < handle
       if nargin < 1
         size = 4000;
       end
-      this.Id = createNetwork(size);
+      this.Id = sig.createNetworkImpl(size);
       this.Schedule = struct('nodeid', {}, 'value', {}, 'when', {});
       this.NodeLine = containers.Map('KeyType', 'int32', 'ValueType', 'int32');
       this.NodeName = containers.Map('KeyType', 'int32', 'ValueType', 'char');
@@ -89,8 +89,8 @@ classdef Net < handle
         % work through them
         for ti = 1:numel(dueTasks)
           % dt = GetSecs - dueTasks(ti).when;
-          affectedIdxs = submit(this.Id, dueTasks(ti).nodeid, dueTasks(ti).value);
-          applyNodes(this.Id, affectedIdxs);
+          affectedIdxs = sig.submitImpl(this.Id, dueTasks(ti).nodeid, dueTasks(ti).value);
+          sig.applyNodesImpl(this.Id, affectedIdxs);
         end
       end
     end
@@ -203,7 +203,7 @@ classdef Net < handle
       disp('**net.delete**');
       if ~isempty(this.Id)
         notify(this, 'Deleting');
-        deleteNetwork(this.Id);
+        sig.deleteNetworkImpl(this.Id);
       end
     end
   end

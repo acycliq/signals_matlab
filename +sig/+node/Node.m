@@ -4,8 +4,6 @@ classdef Node < handle
   
   properties
     FormatSpec
-    % The nodes (and their ordering) which are presented as inputs, e.g.
-    % used in formatting the name of the node, or in a GUI
     DisplayInputs
     Listeners
   end
@@ -17,7 +15,7 @@ classdef Node < handle
   
   properties (SetAccess = private, Transient)
     NetId double
-    Id double
+    NodeId double % Changed from Id to NodeId to avoid conflict
   end
   
   properties (Dependent)
@@ -34,29 +32,25 @@ classdef Node < handle
   end
   
   methods
-    function this = Node(srcs, transFun, transArg, appendValues)
-      if isa(srcs, 'sig.Net')
-        this.Net = srcs;
-        this.Inputs = sig.node.Node.empty;
-      else % assume srcs is an array of input nodes
-        this.Inputs = srcs;
-        this.Net = unique([this.Inputs.Net]);
-        assert(numel(this.Net) == 1);
-      end
-      this.DisplayInputs = this.Inputs;
-      this.NetId = this.Net.Id;
-      inputids = [this.Inputs.Id];
+    function this = Node(net, inputs, transferFun, appendValues)
       if nargin < 2
-        transFun = 'sig.transfer.nop';
+        inputs = [];
       end
       if nargin < 3
-        transArg = [];
+        transferFun = @sig.transfer.nop;
       end
       if nargin < 4
         appendValues = false;
       end
-      opCode = sig.node.transfererOpCode(transFun, transArg);
-      this.Id = addNode(this.NetId, inputids, transFun, opCode, transArg, appendValues);
+      
+      this.Net = net;
+      this.Inputs = inputs;
+      this.NetId = net.Id;
+      
+      manager = sig.getNetworkManager();
+      this.NodeId = manager.addNode(net.Id, [inputs.NodeId], transferFun, appendValues);
+      
+      this.DisplayInputs = inputs;
       this.NetListeners = event.listener(this.Net, 'Deleting', @this.netDeleted);
     end
     
@@ -81,27 +75,33 @@ classdef Node < handle
     end
     
     function v = get.CurrValue(this)
-      v = currNodeValue(this.NetId, this.Id, true);
+      manager = sig.getNetworkManager();
+      [v, ~] = manager.getNodeCurrValue(this.NetId, this.NodeId);
     end
     
     function set.CurrValue(this, v)
-      currNodeValue(this.NetId, this.Id, true, v);
+      manager = sig.getNetworkManager();
+      manager.submit(this.NetId, this.NodeId, v);
     end
     
     function b = get.CurrValueSet(this)
-      [~, b] = currNodeValue(this.NetId, this.Id);
+      manager = sig.getNetworkManager();
+      [~, b] = manager.getNodeCurrValue(this.NetId, this.NodeId);
     end
     
     function v = get.WorkingValue(this)
-      v = workingNodeValue(this.NetId, this.Id, true);
+      manager = sig.getNetworkManager();
+      [v, ~] = manager.getNodeWorkingValue(this.NetId, this.NodeId);
     end
     
     function set.WorkingValue(this, v)
-      workingNodeValue(this.NetId, this.Id, true, v);
+      manager = sig.getNetworkManager();
+      manager.setNodeWorkingValue(this.NetId, this.NodeId, v);
     end
     
     function b = get.WorkingValueSet(this)
-      [~, b] = workingNodeValue(this.NetId, this.Id);
+      manager = sig.getNetworkManager();
+      [~, b] = manager.getNodeWorkingValue(this.NetId, this.NodeId);
     end
     
     function n = names(those)

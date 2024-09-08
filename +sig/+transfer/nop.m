@@ -1,4 +1,4 @@
-function [val, valset] = nop(net, inputs, node, ~)
+function [val, valset] = nop(varargin)
 % SIG.TRANSFER.NOP Performs no operation 
 %   Regardless of inputs, returns as if nothing is set.  This is the
 %   default transfer function if none is provided to the sig.node.Node
