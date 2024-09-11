@@ -77,7 +77,7 @@ classdef NetworkManager < handle
         function value = getNodeWorkingValue(obj, netId, nodeId)
             node = obj.networks{netId}.nodes{nodeId};
             value = node.workingValue;
-            isSet = ~isempty(value);
+%             isSet = ~isempty(value);
         end
         
         function setNodeWorkingValue(obj, netId, nodeId, value)
