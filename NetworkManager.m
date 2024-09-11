@@ -3,10 +3,25 @@ classdef NetworkManager < handle
         networks
         maxNetworks = 10
     end
+
+    properties
+        version = []
+    end
     
     methods
+        function set_version(obj)
+            if isempty(obj.version)
+                v = rand(1);
+                fprintf("NetworkManager version: %g\n",v);
+                obj.version = v;
+            end
+        end
+
+
         function obj = NetworkManager()
             obj.networks = cell(1, obj.maxNetworks);
+            set_version(obj)
+            disp("Network manager was called")
         end
         
         function netId = createNetwork(obj, size)
@@ -38,6 +53,9 @@ classdef NetworkManager < handle
                 inputs = [];
             end
             network.nodes{nodeId} = struct('id', nodeId, 'inputs', inputs, 'transferFun', transferFun, 'appendValues', appendValues, 'workingValue', [], 'currValue', []);
+
+            % Update the network in obj.networks
+            obj.networks{netId} = network;
         end
         
         function applyNodes(obj, netId, nodeIds)
@@ -56,7 +74,7 @@ classdef NetworkManager < handle
             isSet = ~isempty(value);
         end
         
-        function [value, isSet] = getNodeWorkingValue(obj, netId, nodeId)
+        function value = getNodeWorkingValue(obj, netId, nodeId)
             node = obj.networks{netId}.nodes{nodeId};
             value = node.workingValue;
             isSet = ~isempty(value);
@@ -120,6 +138,7 @@ classdef NetworkManager < handle
                 network = obj.networks{netId};
                 fprintf('Network %d:\n', netId);
                 fprintf('  Number of nodes: %d\n', network.nNodes);
+                fprintf('  Number of free node slots: %d\n', length(find(cellfun(@isempty, network.nodes))));
                 fprintf('  Active: %d\n', network.active);
             else
                 error('Invalid network ID');

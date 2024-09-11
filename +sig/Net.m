@@ -195,6 +195,7 @@ classdef Net < handle
       disp('**net.delete**');
       if ~isempty(this.Id)
         notify(this, 'Deleting');
+        fprintf("Deleting net with Id: %g\n",this.Id);
         sig.deleteNetworkImpl(this.Id);
       end
     end
