@@ -79,6 +79,16 @@ classdef Net < handle
       this.nextNodeId = this.nextNodeId + 1;
     end
     
+    function nodeId = addNodeNow(this, inputs, transferFun, appendValues)
+      nodeId = find(cellfun(@isempty, this.nodes), 1);
+      if isempty(nodeId)
+        error('Maximum number of nodes reached for this network');
+      end
+      % Create the node directly without calling NetworkManager
+      newNode = sig.node.Node(this, nodeId, inputs, transferFun, appendValues);
+      this.nodes{nodeId} = newNode;
+    end
+    
     function runSchedule(this)
     % Apply values to nodes that are due to be updated
     %
@@ -102,8 +112,6 @@ classdef Net < handle
         % slice out due tasks
         dueIdx = [this.Schedule.when] < GetSecs;
         dueTasks = this.Schedule(dueIdx);
-        this.Schedule(dueIdx) = [];
-        % work through them
         for ti = 1:numel(dueTasks)
           % dt = GetSecs - dueTasks(ti).when;
           affectedIdxs = sig.submitImpl(this.Id, dueTasks(ti).nodeid, dueTasks(ti).value);

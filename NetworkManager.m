@@ -42,7 +42,7 @@ classdef NetworkManager < handle
         
         function nodeId = addNode(obj, netId, inputs, transferFun, appendValues)
             network = obj.networks{netId};
-            nodeId = network.addNode(inputs, transferFun, appendValues);  % Use Net's addNode method
+            nodeId = network.addNodeNow(inputs, transferFun, appendValues);
         end
         
         function applyNodes(obj, netId, nodeIds)

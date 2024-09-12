@@ -9,12 +9,11 @@ classdef Node < handle
   end
   
   properties (SetAccess = immutable)
-    Net sig.Net % Parent network
+    NetId double % Parent network ID
     Inputs % Array of input nodes (remove the sig.node.Node restriction)
   end
   
   properties (SetAccess = private, Transient)
-    NetId double
     Id double % Change this back to Id from NodeId
   end
   
@@ -32,30 +31,26 @@ classdef Node < handle
   end
   
   methods
-    function this = Node(net, inputs, transferFun, appendValues)
-      if nargin < 2
+    function this = Node(net, nodeId, inputs, transferFun, appendValues)
+      if nargin < 3
         inputs = [];
       end
-      if nargin < 3
+      if nargin < 4
         transferFun = @sig.transfer.nop;
       end
-      if nargin < 4
+      if nargin < 5
         appendValues = false;
       end
       
-      this.Net = net;
-      this.Inputs = inputs; % Set inputs without type checking
       this.NetId = net.Id;
+      this.Id = nodeId;
+      this.Inputs = inputs;
       
-      manager = sig.getNetworkManager();
-      inputIds = [];
-      if ~isempty(inputs)
-        inputIds = [inputs.Id];
-      end
-      this.Id = manager.addNode(net.Id, inputIds, transferFun, appendValues);
-      
+      % Set other properties as needed
       this.DisplayInputs = inputs;
-      this.NetListeners = event.listener(this.Net, 'Deleting', @this.netDeleted);
+      this.NetListeners = event.listener(net, 'Deleting', @this.netDeleted);
+      
+      % You may want to store transferFun and appendValues as properties if needed
     end
     
     function v = get.Name(this)
