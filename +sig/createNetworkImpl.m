@@ -1,18 +1,11 @@
-function networkId = createNetworkImpl(size, deleteCallback)
-    if nargin < 1
-        size = 4000;
+function id = createNetworkImpl(size)
+    % Create a new network and return its unique identifier
+    % This is a placeholder implementation. Replace with actual logic.
+    persistent networkCounter;
+    if isempty(networkCounter)
+        networkCounter = 0;
     end
-    
-    manager = sig.getNetworkManager();
-    networkId = manager.createNetwork(size);
-    
-    if nargin >= 2 && ~isempty(deleteCallback)
-        manager.setNetworkDeleteCallback(networkId, deleteCallback);
-    end
-    
-    % Set up cleanup on MATLAB exit
-    persistent cleanupObj
-    if isempty(cleanupObj)
-        cleanupObj = onCleanup(@() manager.deleteAllNetworks());
-    end
+    networkCounter = networkCounter + 1;
+    id = networkCounter;
+    % Initialize network storage or other necessary setup here
 end

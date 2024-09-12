@@ -34,6 +34,11 @@ classdef Net < handle
     NodeLine
   end
   
+  properties
+    nodes
+    nextNodeId
+  end
+  
   events
     % Triggered when the object is being deleted. NB: The underlying mexnet
     % may be deleted without a call to this.  @TODO: Use superclass event
@@ -60,6 +65,18 @@ classdef Net < handle
       this.Schedule = struct('nodeid', {}, 'value', {}, 'when', {});
       this.NodeLine = containers.Map('KeyType', 'int32', 'ValueType', 'int32');
       this.NodeName = containers.Map('KeyType', 'int32', 'ValueType', 'char');
+      this.nodes = cell(1, size);
+      this.nextNodeId = 1;
+      
+      % Register this network with the NetworkManager
+      manager = sig.getNetworkManager();
+      netId = manager.createNetwork(size);
+      manager.networks{netId} = this;
+    end
+    
+    function nodeId = getNextNodeId(this)
+      nodeId = this.nextNodeId;
+      this.nextNodeId = this.nextNodeId + 1;
     end
     
     function runSchedule(this)

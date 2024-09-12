@@ -1,7 +1,7 @@
 function manager = getNetworkManager()
-    persistent networkManager
-    if isempty(networkManager)
-        networkManager = NetworkManager();
+    persistent networkManagerInstance;
+    if isempty(networkManagerInstance)
+        networkManagerInstance = NetworkManager();
     end
-    manager = networkManager;
+    manager = networkManagerInstance;
 end
