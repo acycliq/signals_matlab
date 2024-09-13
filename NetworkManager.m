@@ -41,8 +41,20 @@ classdef NetworkManager < handle
         end
         
         function nodeId = addNode(obj, netId, inputs, transferFun, appendValues)
+            arguments
+                obj NetworkManager
+
+                netId = 1
+        
+                inputs = []
+        
+                transferFun = @sig.transfer.nop
+        
+                appendValues = false
+            end
+
             network = obj.networks{netId};
-            nodeId = network.addNodeNow(inputs, transferFun, appendValues);
+            nodeId = network.addNode(inputs, transferFun, appendValues);
         end
         
         function applyNodes(obj, netId, nodeIds)

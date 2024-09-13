@@ -14,7 +14,11 @@ classdef Node < handle
   end
   
   properties (SetAccess = private, Transient)
-    Id double % Change this back to Id from NodeId
+    Id double 
+    transferFun % That is probably called transferer on the MEX side 
+    appendValues
+    % I think  I should also move here the rest of the properties declared
+    % in network.h, line 52 (targets, eventsTarget, inUse, queued)
   end
   
   properties (Dependent)
@@ -45,6 +49,8 @@ classdef Node < handle
       this.NetId = net.Id;
       this.Id = nodeId;
       this.Inputs = inputs;
+      this.transferFun = transferFun;
+      this.appendValues = appendValues;
       
       % Set other properties as needed
       this.DisplayInputs = inputs;

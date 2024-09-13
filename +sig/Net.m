@@ -61,7 +61,7 @@ classdef Net < handle
       if nargin < 1
         size = 4000;
       end
-      this.Id = sig.createNetworkImpl(size);
+      this.Id = sig.network_uid();
       this.Schedule = struct('nodeid', {}, 'value', {}, 'when', {});
       this.NodeLine = containers.Map('KeyType', 'int32', 'ValueType', 'int32');
       this.NodeName = containers.Map('KeyType', 'int32', 'ValueType', 'char');
@@ -74,12 +74,14 @@ classdef Net < handle
       manager.networks{netId} = this;
     end
     
-    function nodeId = getNextNodeId(this)
-      nodeId = this.nextNodeId;
-      this.nextNodeId = this.nextNodeId + 1;
-    end
+    % function nodeId = getNextNodeId(this)
+    %   nodeId = this.nextNodeId;
+    %   this.nextNodeId = this.nextNodeId + 1;
+    % end
     
-    function nodeId = addNodeNow(this, inputs, transferFun, appendValues)
+    function nodeId = addNode(this, inputs, transferFun, appendValues)
+      % Find the first empty node slot and populate it with a new node object
+      
       nodeId = find(cellfun(@isempty, this.nodes), 1);
       if isempty(nodeId)
         error('Maximum number of nodes reached for this network');
@@ -87,6 +89,19 @@ classdef Net < handle
       % Create the node directly without calling NetworkManager
       newNode = sig.node.Node(this, nodeId, inputs, transferFun, appendValues);
       this.nodes{nodeId} = newNode;
+    end
+
+    function deleteNode(this, nodeId)
+        if ~isempty(this.Id)
+            netId = this.Id;
+            nm = sig.getNetworkManager();
+            fprintf('deleteNode: Deleting node %d from network %d\n', nodeId, netId);
+            if netId > 0 && netId <= nm.maxNetworks && ~isempty(nm.networks{netId})
+                nm.networks{netId}.nodes{nodeId} = [];
+            else
+                error('Invalid network ID or node ID');
+            end
+        end
     end
     
     function runSchedule(this)
