@@ -26,8 +26,7 @@ classdef NetworkManager < handle
 
         function deleteNetwork(obj, netId)
             if netId > 0 && netId <= obj.maxNetworks && ~isempty(obj.networks{netId})
-                delete(obj.networks{netId});  % Call delete method of Net object
-                obj.networks{netId} = [];
+                delete(obj.networks{netId});  % Call destructor of Net object
             else
                 error('Invalid network ID');
             end
