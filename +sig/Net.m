@@ -66,18 +66,11 @@ classdef Net < handle
       this.NodeLine = containers.Map('KeyType', 'int32', 'ValueType', 'int32');
       this.NodeName = containers.Map('KeyType', 'int32', 'ValueType', 'char');
       this.nodes = cell(1, size);
-      this.nextNodeId = 1;
       
       % Register this network with the NetworkManager
       manager = sig.getNetworkManager();
-      netId = manager.createNetwork(size);
-      manager.networks{netId} = this;
+      manager.networks{this.Id} = this;
     end
-    
-    % function nodeId = getNextNodeId(this)
-    %   nodeId = this.nextNodeId;
-    %   this.nextNodeId = this.nextNodeId + 1;
-    % end
     
     function nodeId = addNode(this, inputs, transferFun, appendValues)
       % Find the first empty node slot and populate it with a new node object

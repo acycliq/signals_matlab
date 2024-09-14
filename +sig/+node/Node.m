@@ -74,7 +74,7 @@ classdef Node < handle
     
     function delete(this)
       if ~isempty(this.Id)
-%         fprintf('Deleting node ''%s''\n', this.Name);
+        fprintf('Node destructor: Deleting from network %d node %d \n',  this.NetId, this.Id);
         sig.deleteNodeImpl(this.NetId, this.Id);
       end
     end

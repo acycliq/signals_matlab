@@ -23,14 +23,7 @@ classdef NetworkManager < handle
             disp("Network manager was called")
         end
         
-        function netId = createNetwork(obj, size)
-            netId = find(cellfun(@isempty, obj.networks), 1);
-            if isempty(netId)
-                error('Maximum number of networks reached');
-            end
-            % No need to instantiate Net object here, it will be done in Net class
-        end
-        
+
         function deleteNetwork(obj, netId)
             if netId > 0 && netId <= obj.maxNetworks && ~isempty(obj.networks{netId})
                 delete(obj.networks{netId});  % Call delete method of Net object
@@ -55,6 +48,11 @@ classdef NetworkManager < handle
 
             network = obj.networks{netId};
             nodeId = network.addNode(inputs, transferFun, appendValues);
+        end
+
+        function deleteNode(obj, netId, nodeId)
+            network = obj.networks{netId};
+            delete(network.nodes{nodeId}) % delete the object, the destuctor should be called
         end
         
         function applyNodes(obj, netId, nodeIds)
@@ -118,11 +116,6 @@ classdef NetworkManager < handle
                     obj.deleteNetwork(i);
                 end
             end
-        end
-        
-        function deleteNode(obj, netId, nodeId)
-            network = obj.networks{netId};
-            network.deleteNode(nodeId);  % Use Net's deleteNode method
         end
         
         function displayNetworkInfo(obj, netId)
