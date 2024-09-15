@@ -47,7 +47,7 @@ classdef Net < handle
   end
   
   methods
-    function this = Net(size)
+    function this = Net(size, name)
       % SIG.NET Create a new network for managing Signal's nodes
       %   Initializes a network of a given size in mexnet that will contain
       %   and manage Signals nodes.
@@ -61,15 +61,18 @@ classdef Net < handle
       if nargin < 1
         size = 4000;
       end
-      this.Id = sig.network_uid();
+      if nargin < 2
+        name = '';
+      end
+      
       this.Schedule = struct('nodeid', {}, 'value', {}, 'when', {});
       this.NodeLine = containers.Map('KeyType', 'int32', 'ValueType', 'int32');
       this.NodeName = containers.Map('KeyType', 'int32', 'ValueType', 'char');
       this.nodes = cell(1, size);
+      this.nextNodeId = 1;
       
-      % Register this network with the NetworkManager
-      manager = sig.getNetworkManager();
-      manager.networks{this.Id} = this;
+      % The ID will be set by the NetworkManager
+      this.Id = [];
     end
     
     function nodeId = addNode(this, inputs, transferFun, appendValues)

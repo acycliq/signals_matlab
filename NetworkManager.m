@@ -2,6 +2,7 @@ classdef NetworkManager < handle
     properties
         networks
         maxNetworks = 10
+        networkNames containers.Map % New property to store network names
     end
 
     properties
@@ -19,14 +20,63 @@ classdef NetworkManager < handle
 
         function obj = NetworkManager()
             obj.networks = cell(1, obj.maxNetworks);
+            obj.networkNames = containers.Map('KeyType', 'char', 'ValueType', 'uint32');
             set_version(obj)
             disp("Network manager was called")
         end
         
+        function createNetwork(obj, name, size)
+            if obj.networkNames.isKey(name)
+                error('A network with this name already exists');
+            end
+            
+            % Find the first empty slot
+            netId = find(cellfun(@isempty, obj.networks), 1);
+            if isempty(netId)
+                error('Maximum number of networks reached');
+            end
+            
+            % Create the network in the base workspace
+            newNet = sig.Net(size, name);
+            assignin('base', name, newNet);
+            
+            % Store the network
+            obj.networks{netId} = newNet;
+            obj.networkNames(name) = netId;
+            
+            fprintf('Created network "%s" with ID %d and size %d\n', name, netId, size);
+        end
 
         function deleteNetwork(obj, netId)
             if netId > 0 && netId <= obj.maxNetworks && ~isempty(obj.networks{netId})
-                delete(obj.networks{netId});  % Call destructor of Net object
+                % Find the name associated with this netId
+                names = obj.networkNames.keys;
+                for i = 1:length(names)
+                    if obj.networkNames(names{i}) == netId
+                        networkName = names{i};
+                        break;
+                    end
+                end
+                
+                % Delete the network object
+                delete(obj.networks{netId});
+                
+                % Remove the network from our storage
+                obj.networks{netId} = [];
+                
+                % Remove the name from our map
+                if exist('networkName', 'var')
+                    remove(obj.networkNames, networkName);
+                    
+                    % Remove the variable from the base workspace
+                    if evalin('base', sprintf('exist(''%s'', ''var'')', networkName))
+                        evalin('base', sprintf('clear %s', networkName));
+                    end
+                    
+                    fprintf('Network "%s" (ID: %d) has been deleted and removed from the workspace.\n', networkName, netId);
+                else
+                    fprintf('Network with ID %d has been deleted.\n', netId);
+                end
             else
                 error('Invalid network ID');
             end
