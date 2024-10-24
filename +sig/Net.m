@@ -66,48 +66,11 @@ classdef Net < handle
       if nargin < 1
         size = 4000;
       end
-      this.Id = createNetwork(size);
+      this.Id = sig.Net.createNetwork(size);
       this.Schedule = struct('nodeid', {}, 'value', {}, 'when', {});
       this.NodeLine = containers.Map('KeyType', 'int32', 'ValueType', 'int32');
       this.NodeName = containers.Map('KeyType', 'int32', 'ValueType', 'char');
     end
-
-  methods (Static, Access = private)
-    function id = createNetwork(size)
-        persistent networkCounter
-        persistent networks
-
-        if isempty(networkCounter)
-            networkCounter = 0;
-            networks = cell(1, 10); % Maximum of 10 networks allowed
-        end
-
-        if networkCounter >= 10
-            error('Maximum number of networks (10) reached');
-        end
-
-        networkCounter = networkCounter + 1;
-        id = networkCounter;
-
-        networks{id} = struct(...
-            'nodes', cell(1, size), ...
-            'nNodes', size, ...
-            'active', true, ...
-            'deleteCallback', []);
-
-        % Set up cleanup callback
-        cleanupObj = onCleanup(@() Net.deleteNetwork(id));
-        networks{id}.deleteCallback = cleanupObj;
-    end
-
-    function deleteNetwork(id)
-        persistent networks
-        if ~isempty(networks) && id <= numel(networks) && ~isempty(networks{id})
-            fprintf('Deleting network %d\n', id);
-            networks{id} = [];
-        end
-    end
-  end
     
     function runSchedule(this)
     % Apply values to nodes that are due to be updated
@@ -252,6 +215,43 @@ classdef Net < handle
         notify(this, 'Deleting');
         deleteNetwork(this.Id);
       end
+    end
+  end
+
+  methods (Static, Access = private)
+    function id = createNetwork(size)
+        persistent networkCounter
+        persistent networks
+
+        if isempty(networkCounter)
+            networkCounter = 0;
+            networks = cell(1, 10); % Maximum of 10 networks allowed
+        end
+
+        if networkCounter >= 10
+            error('Maximum number of networks (10) reached');
+        end
+
+        networkCounter = networkCounter + 1;
+        id = networkCounter;
+
+        networks{id} = struct(...
+            'nodes', cell(1, size), ...
+            'nNodes', size, ...
+            'active', true, ...
+            'deleteCallback', []);
+
+        % Set up cleanup callback
+        cleanupObj = onCleanup(@() sig.Net.deleteNetwork(id));
+        networks{id}.deleteCallback = cleanupObj;
+    end
+
+    function deleteNetwork(id)
+        persistent networks
+        if ~isempty(networks) && id <= numel(networks) && ~isempty(networks{id})
+            fprintf('Deleting network %d\n', id);
+            networks{id} = [];
+        end
     end
   end
   
