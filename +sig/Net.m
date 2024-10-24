@@ -15,6 +15,18 @@ classdef Net < handle
     % recorded when new nodes are added to the network.
     Debug matlab.lang.OnOffSwitchState = 'off'
   end
+
+  properties (Access = private)
+      Nodes % Stores an array of Node structs, representing all nodes in the network.
+      NNodes  % NNodes: Stores the size of the network (maximum number of nodes).
+      Active % Active: A boolean indicating if the network is active.
+      DeleteCallback % A callback function to be executed when the network is deleted.
+  end
+
+  properties (SetAccess = private)
+      % The unique network identifier.
+      Id
+  end
   
   properties (Transient)
     % A structure holding node ids, the values they should take and the
@@ -24,8 +36,6 @@ classdef Net < handle
   end
   
   properties (SetAccess = private, Transient)
-    % The unique network identifier.
-    Id double
     % The names of the network's nodes mapped to their ids; for debugging
     % purposes.
     NodeName
@@ -61,6 +71,43 @@ classdef Net < handle
       this.NodeLine = containers.Map('KeyType', 'int32', 'ValueType', 'int32');
       this.NodeName = containers.Map('KeyType', 'int32', 'ValueType', 'char');
     end
+
+  methods (Static, Access = private)
+    function id = createNetwork(size)
+        persistent networkCounter
+        persistent networks
+
+        if isempty(networkCounter)
+            networkCounter = 0;
+            networks = cell(1, 10); % Maximum of 10 networks allowed
+        end
+
+        if networkCounter >= 10
+            error('Maximum number of networks (10) reached');
+        end
+
+        networkCounter = networkCounter + 1;
+        id = networkCounter;
+
+        networks{id} = struct(...
+            'nodes', cell(1, size), ...
+            'nNodes', size, ...
+            'active', true, ...
+            'deleteCallback', []);
+
+        % Set up cleanup callback
+        cleanupObj = onCleanup(@() Net.deleteNetwork(id));
+        networks{id}.deleteCallback = cleanupObj;
+    end
+
+    function deleteNetwork(id)
+        persistent networks
+        if ~isempty(networks) && id <= numel(networks) && ~isempty(networks{id})
+            fprintf('Deleting network %d\n', id);
+            networks{id} = [];
+        end
+    end
+  end
     
     function runSchedule(this)
     % Apply values to nodes that are due to be updated
