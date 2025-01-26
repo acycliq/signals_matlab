@@ -372,6 +372,12 @@ classdef Signal < handle
     function c = plus(a, b)
       % New signal carrying the addition between signals
       c = map2(a, b, @plus, '(%s + %s)');
+      if isa(a, 'sig.Signal')
+        a.node.next{end+1} = c.node;
+      end
+      if isa(b, 'sig.Signal')
+        b.node.next{end+1} = c.node;
+      end
     end
     
     function c = minus(a, b)
@@ -387,6 +393,12 @@ classdef Signal < handle
     function c = mtimes(a, b)
       % New signal carrying the matrix multiplication between signals
       c = map2(a, b, @mtimes, '%s*%s');
+      if isa(a, 'sig.Signal')
+        a.node.next{end+1} = c.node;
+      end
+      if isa(b, 'sig.Signal')
+        b.node.next{end+1} = c.node;
+      end
     end
     
     function c = mrdivide(a, b)
@@ -402,6 +414,12 @@ classdef Signal < handle
     function c = mpower(a, b)
       % New signal carrying the matrix power of 'a' to the 'b'
       c = map2(a, b, @mpower, '%s^%s');
+      if isa(a, 'sig.Signal')
+        a.node.next{end+1} = c.node;
+      end
+      if isa(b, 'sig.Signal')
+        b.node.next{end+1} = c.node;
+      end
     end
     
     function c = power(a, b)
