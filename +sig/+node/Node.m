@@ -8,6 +8,10 @@ classdef Node < handle
     % used in formatting the name of the node, or in a GUI
     DisplayInputs
     Listeners
+    transFun
+    transArg
+    next
+    value
   end
   
   properties (SetAccess = immutable)
@@ -58,6 +62,9 @@ classdef Node < handle
       opCode = sig.node.transfererOpCode(transFun, transArg);
       this.Id = addNode(this.NetId, inputids, transFun, opCode, transArg, appendValues);
       this.NetListeners = event.listener(this.Net, 'Deleting', @this.netDeleted);
+      this.transFun = transFun;
+      this.transArg = transArg;
+      this.next = {};
     end
     
     function v = get.Name(this)
@@ -86,6 +93,7 @@ classdef Node < handle
     
     function set.CurrValue(this, v)
       currNodeValue(this.NetId, this.Id, true, v);
+      this.value = v;
     end
     
     function b = get.CurrValueSet(this)
