@@ -44,6 +44,51 @@ classdef OriginSignal < sig.node.Signal
       applyNodes(this.Node.NetId, affectedIdxs);
     end
 
+    function post2(this, value)
+        % Assign value and compute forward pass
+        this.node.value = value;
+        topo = {};
+        visited = {};
+
+        function build_topo(node)
+            % Check if node is already visited
+            % This will It create an ordered list
+            % of nodes that ensures that when we
+            % compute values, we do them in the
+            % correct order (dependencies first)
+            %
+            % Maybe it makes sense to store that
+            % once calculated so we will not have
+            % to build again
+            if ~any(cellfun(@(x) x == node, visited))
+                visited{end+1} = node;
+                for i = 1:length(node.next)
+                    build_topo(node.next{i});
+                end
+                topo{end+1} = node;
+            end
+        end
+
+        build_topo(this.node);
+
+        fprintf('Assigning %s = %g\n', this.Name, this.node.value);
+        for j = length(topo):-1:1
+            n = topo{j};
+            if isempty(n.Inputs)
+                % do nothing
+            elseif strcmp(n.transFun, 'sig.transfer.nop')
+                 n.value = n.Inputs(1).value;
+            else
+                % Check if both inputs have non-empty values
+                if ~isempty(n.Inputs(1).value) && ~isempty(n.Inputs(2).value)
+                    fun = n.transArg{1}; 
+                    n.value = fun(n.Inputs(1).value, n.Inputs(2).value);
+                end
+            end
+            % fprintf('id: %d, name: %s, value: %d \n', n.Id, n.Name, n.value);
+        end
+    end    
+
     function delayedPost(this, value, delay)
       % DELAYEDPOST Assigns a value to this Signal after a given delay
       %   S.DELAYEDPOST(VALUE, DELAY) or S.DELAYEDPOST({VALUE, DELAY})
