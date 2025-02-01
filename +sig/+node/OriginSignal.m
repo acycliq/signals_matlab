@@ -50,24 +50,18 @@ classdef OriginSignal < sig.node.Signal
     function post2(this, value)
         % Assign value and compute forward pass
         this.node.value = value;
-        
+
         % Check if the topological order is already cached
         if isempty(this.topo)
-            visited = {};
-            topo = {};
-            
-            % Build the topology
-            build_topo(this.node);
-            
-            % Cache the computed topological order
-            this.topo = topo;
+            this.topo = this.build_topo(this.node);
         else
-            topo = this.topo;  % Use the cached order
             fprintf('Using cached topology.\n');
         end
-        
+
+        topo = this.topo;
+
         fprintf('Assigning %s = %g\n', this.Name, this.node.value);
-        
+
         % Process nodes in reverse topological order
         for j = length(topo):-1:1
             n = topo{j};
@@ -78,20 +72,9 @@ classdef OriginSignal < sig.node.Signal
             else
                 % Ensure both inputs have valid values before applying the function
                 if ~isempty(n.Inputs(1).value) && ~isempty(n.Inputs(2).value)
-                    fun = n.transArg{1}; 
+                    fun = n.transArg{1};
                     n.value = fun(n.Inputs(1).value, n.Inputs(2).value);
                 end
-            end
-        end
-    
-        function build_topo(node)
-            % If the node hasn't been visited yet
-            if ~any(cellfun(@(x) x == node, visited))
-                visited{end+1} = node;
-                for i = 1:length(node.next)
-                    build_topo(node.next{i});
-                end
-                topo{end+1} = node;
             end
         end
     end
@@ -128,5 +111,33 @@ classdef OriginSignal < sig.node.Signal
       this.Node.Net.Schedule(end+1) = struct('nodeid', this.Node.Id, 'value', value, 'when', t + delay);
     end
   end
+
+  methods (Access = private)
+      function topo = build_topo(this, node)
+          % build_topo Computes the topological ordering of nodes
+          %
+          %   topo = build_topo(node) traverses the network starting
+          %   from 'node', collecting nodes in a topological order so that
+          %   each node's dependencies are processed before the node itself.
+
+          visited = {};
+          topo = {};
+
+          % Recursive helper function to perform the traversal.
+          function recursive_topo(n)
+              if ~any(cellfun(@(x) x == n, visited))
+                  visited{end+1} = n;
+                  for i = 1:length(n.next)
+                      recursive_topo(n.next{i});
+                  end
+                  topo{end+1} = n;
+              end
+          end
+
+          % Start the recursion from the input node.
+          recursive_topo(node);
+      end
+  end
+
 end
 
