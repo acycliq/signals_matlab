@@ -2,6 +2,9 @@ classdef OriginSignal < sig.node.Signal
   % SIG.NODE.ORIGINSIGNAL An input Signal class
   %   A subclass that provides methods for directly setting the signal's
   %   value.
+ properties (Access = private)
+     topo = [];  % Initialize as empty. It will keep the topological map of the network
+ end
   
   methods
     function this = OriginSignal(node)
@@ -47,19 +50,42 @@ classdef OriginSignal < sig.node.Signal
     function post2(this, value)
         % Assign value and compute forward pass
         this.node.value = value;
-        topo = {};
-        visited = {};
-
+        
+        % Check if the topological order is already cached
+        if isempty(this.topo)
+            visited = {};
+            topo = {};
+            
+            % Build the topology
+            build_topo(this.node);
+            
+            % Cache the computed topological order
+            this.topo = topo;
+        else
+            topo = this.topo;  % Use the cached order
+            fprintf('Using cached topology.\n');
+        end
+        
+        fprintf('Assigning %s = %g\n', this.Name, this.node.value);
+        
+        % Process nodes in reverse topological order
+        for j = length(topo):-1:1
+            n = topo{j};
+            if isempty(n.Inputs)
+                % Do nothing if there are no inputs
+            elseif strcmp(n.transFun, 'sig.transfer.nop')
+                n.value = n.Inputs(1).value;
+            else
+                % Ensure both inputs have valid values before applying the function
+                if ~isempty(n.Inputs(1).value) && ~isempty(n.Inputs(2).value)
+                    fun = n.transArg{1}; 
+                    n.value = fun(n.Inputs(1).value, n.Inputs(2).value);
+                end
+            end
+        end
+    
         function build_topo(node)
-            % Check if node is already visited
-            % This will It create an ordered list
-            % of nodes that ensures that when we
-            % compute values, we do them in the
-            % correct order (dependencies first)
-            %
-            % Maybe it makes sense to store that
-            % once calculated so we will not have
-            % to build again
+            % If the node hasn't been visited yet
             if ~any(cellfun(@(x) x == node, visited))
                 visited{end+1} = node;
                 for i = 1:length(node.next)
@@ -68,26 +94,9 @@ classdef OriginSignal < sig.node.Signal
                 topo{end+1} = node;
             end
         end
+    end
 
-        build_topo(this.node);
 
-        fprintf('Assigning %s = %g\n', this.Name, this.node.value);
-        for j = length(topo):-1:1
-            n = topo{j};
-            if isempty(n.Inputs)
-                % do nothing
-            elseif strcmp(n.transFun, 'sig.transfer.nop')
-                 n.value = n.Inputs(1).value;
-            else
-                % Check if both inputs have non-empty values
-                if ~isempty(n.Inputs(1).value) && ~isempty(n.Inputs(2).value)
-                    fun = n.transArg{1}; 
-                    n.value = fun(n.Inputs(1).value, n.Inputs(2).value);
-                end
-            end
-            % fprintf('id: %d, name: %s, value: %d \n', n.Id, n.Name, n.value);
-        end
-    end    
 
     function delayedPost(this, value, delay)
       % DELAYEDPOST Assigns a value to this Signal after a given delay
