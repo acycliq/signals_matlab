@@ -14,6 +14,7 @@ classdef Net < handle
     % Debug mode.  When true the names and function line numbers are
     % recorded when new nodes are added to the network.
     Debug matlab.lang.OnOffSwitchState = 'off'
+    network = [];
   end
   
   properties (Transient)
@@ -56,12 +57,32 @@ classdef Net < handle
       if nargin < 1
         size = 4000;
       end
-      this.Id = createNetwork(size);
+      this.Id = this.createNetwork(size);
       this.Schedule = struct('nodeid', {}, 'value', {}, 'when', {});
       this.NodeLine = containers.Map('KeyType', 'int32', 'ValueType', 'int32');
       this.NodeName = containers.Map('KeyType', 'int32', 'ValueType', 'char');
     end
+
+    function Id = createNetwork(this, size)
+%         this.delete()
+        Id = 1;
+        this.network = struct( ...
+            'Id', Id, ...
+            'nodes', {cell(1, size)}, ...
+            'nNodes', 0, ...
+            'active', true, ...
+            'deleteCallback', [] ...
+            );
+    end
     
+    function nodeId = addNode(this, newNode)
+        nodeId = find(cellfun(@isempty, this.network.nodes), 1, 'first');
+        if isempty(nodeId)
+            error('No empty cell found in the nodes array.');
+        end
+        this.network.nodes{nodeId} = newNode;
+    end
+
     function runSchedule(this)
     % Apply values to nodes that are due to be updated
     %
@@ -110,7 +131,8 @@ classdef Net < handle
       %          3.1416
       %
       % See also sig.node.OriginSignal, sig.Net.subscriptableOrigin
-      s = sig.node.OriginSignal(rootNode(this, name));
+      rn = rootNode(this, name);
+      s = sig.node.OriginSignal(rn);
     end
     
     function s = subscriptableOrigin(this, name)
@@ -202,8 +224,9 @@ classdef Net < handle
     function delete(this)
       disp('**net.delete**');
       if ~isempty(this.Id)
+        fprintf('deleting network with id: %d \n' , this.Id)
         notify(this, 'Deleting');
-        deleteNetwork(this.Id);
+        this.network = [];
       end
     end
   end

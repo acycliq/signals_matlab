@@ -60,11 +60,11 @@ classdef Node < handle
         appendValues = false;
       end
       opCode = sig.node.transfererOpCode(transFun, transArg);
-      this.Id = addNode(this.NetId, inputids, transFun, opCode, transArg, appendValues);
       this.NetListeners = event.listener(this.Net, 'Deleting', @this.netDeleted);
       this.transFun = transFun;
       this.transArg = transArg;
       this.next = {};
+      this.Net.addNode(this);
     end
     
     function v = get.Name(this)
@@ -82,8 +82,9 @@ classdef Node < handle
     
     function delete(this)
       if ~isempty(this.Id)
-%         fprintf('Deleting node ''%s''\n', this.Name);
-        deleteNode(this.NetId, this.Id);
+        fprintf('Deleting node ''%s''\n', this.Name);
+        this.Net.network.nodes{this.Id} = [];
+%         deleteNode(this.NetId, this.Id);
       end
     end
     
@@ -93,7 +94,6 @@ classdef Node < handle
     
     function set.CurrValue(this, v)
       currNodeValue(this.NetId, this.Id, true, v);
-      this.value = v;
     end
     
     function b = get.CurrValueSet(this)
@@ -120,6 +120,14 @@ classdef Node < handle
     end
     
     function setInputs(this, nodes)
+    end
+
+    function v = get.value(this)
+        v = this.value;
+    end
+
+    function set.value(this, v)
+        this.value = v;
     end
   end
   
