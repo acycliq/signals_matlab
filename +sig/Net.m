@@ -80,6 +80,7 @@ classdef Net < handle
         if isempty(nodeId)
             error('No empty cell found in the nodes array.');
         end
+        newNode.Id = nodeId;
         this.network.nodes{nodeId} = newNode;
     end
 

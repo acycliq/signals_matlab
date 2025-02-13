@@ -12,6 +12,7 @@ classdef Node < handle
     transArg
     next
     value
+    Id
   end
   
   properties (SetAccess = immutable)
@@ -21,7 +22,6 @@ classdef Node < handle
   
   properties (SetAccess = private, Transient)
     NetId double
-    Id double
   end
   
   properties (Dependent)
