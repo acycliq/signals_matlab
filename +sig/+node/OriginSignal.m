@@ -49,7 +49,7 @@ classdef OriginSignal < sig.node.Signal
 
     function post2(this, value)
         % Assign value and compute forward pass
-        this.node.value = value;
+        this.node.CurrValue = value;
 
         % Check if the topological order is already cached
         if isempty(this.topo)
@@ -60,7 +60,7 @@ classdef OriginSignal < sig.node.Signal
 
         topo = this.topo;
 
-        fprintf('Assigning %s = %g\n', this.Name, this.node.value);
+        fprintf('Assigning %s = %g\n', this.Name, this.node.CurrValue);
 
         % Process nodes in reverse topological order
         for j = length(topo):-1:1
@@ -71,9 +71,9 @@ classdef OriginSignal < sig.node.Signal
                 n.value = n.Inputs(1).value;
             else
                 % Ensure both inputs have valid values before applying the function
-                if ~isempty(n.Inputs(1).value) && ~isempty(n.Inputs(2).value)
+                if ~isempty(n.Inputs(1).CurrValue) && ~isempty(n.Inputs(2).CurrValue)
                     fun = n.transArg{1};
-                    n.value = fun(n.Inputs(1).value, n.Inputs(2).value);
+                    n.CurrValue = fun(n.Inputs(1).CurrValue, n.Inputs(2).CurrValue);
                 end
             end
         end

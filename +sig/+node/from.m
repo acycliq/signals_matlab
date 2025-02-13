@@ -21,8 +21,7 @@ for i = 1:numel(srcs)
     % If not a signal, create new node whose name and current value is the
     % source value.
     nodes(i) = rootNode(net, toStr(srcs{i}));
-%     nodes(i).CurrValue = srcs{i};
-    nodes(i).value = srcs{i};
+    nodes(i).CurrValue = srcs{i};
   end
 end
 

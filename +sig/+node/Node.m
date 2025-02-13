@@ -11,8 +11,8 @@ classdef Node < handle
     transFun
     transArg
     next
-    value
     Id
+    CurrValue
   end
   
   properties (SetAccess = immutable)
@@ -26,7 +26,6 @@ classdef Node < handle
   
   properties (Dependent)
     Name
-    CurrValue
     CurrValueSet
     WorkingValue
     WorkingValueSet
@@ -89,11 +88,13 @@ classdef Node < handle
     end
     
     function v = get.CurrValue(this)
-      v = currNodeValue(this.NetId, this.Id, true);
+%       v = currNodeValue(this.NetId, this.Id, true);
+      v = this.CurrValue;
     end
     
     function set.CurrValue(this, v)
-      currNodeValue(this.NetId, this.Id, true, v);
+%       currNodeValue(this.NetId, this.Id, true, v);
+      this.CurrValue = v;
     end
     
     function b = get.CurrValueSet(this)
@@ -121,14 +122,14 @@ classdef Node < handle
     
     function setInputs(this, nodes)
     end
-
-    function v = get.value(this)
-        v = this.value;
-    end
-
-    function set.value(this, v)
-        this.value = v;
-    end
+% 
+%     function v = get.value(this)
+%         v = this.value;
+%     end
+% 
+%     function set.value(this, v)
+%         this.value = v;
+%     end
   end
   
   methods (Access = protected)
