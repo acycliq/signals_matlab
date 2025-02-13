@@ -10,9 +10,10 @@ classdef Node < handle
     Listeners
     transFun
     transArg
-    next
+%     next
     Id
     CurrValue
+    Targets % will keep the input nodes (aka children)
   end
   
   properties (SetAccess = immutable)
@@ -62,7 +63,7 @@ classdef Node < handle
       this.NetListeners = event.listener(this.Net, 'Deleting', @this.netDeleted);
       this.transFun = transFun;
       this.transArg = transArg;
-      this.next = {};
+      this.Targets = {};
       this.Net.addNode(this);
     end
     

@@ -127,8 +127,8 @@ classdef OriginSignal < sig.node.Signal
           function recursive_topo(n)
               if ~any(cellfun(@(x) x == n, visited))
                   visited{end+1} = n;
-                  for i = 1:length(n.next)
-                      recursive_topo(n.next{i});
+                  for i = 1:length(n.Targets)
+                      recursive_topo(n.Targets{i});
                   end
                   topo{end+1} = n;
               end
