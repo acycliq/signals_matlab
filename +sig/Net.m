@@ -14,7 +14,11 @@ classdef Net < handle
     % Debug mode.  When true the names and function line numbers are
     % recorded when new nodes are added to the network.
     Debug matlab.lang.OnOffSwitchState = 'off'
-    network = [];
+    nodes = []
+
+    % maybe these two below are not needed outside mexnet?
+    active = true
+    deleteCallback = []
   end
   
   properties (Transient)
@@ -33,6 +37,10 @@ classdef Net < handle
     % A map of function line numbers where each node was defined; for
     % debugging purposes.
     NodeLine
+  end
+
+  properties (Dependent)
+    nNodes  % Number of non-empty nodes in the network
   end
   
   events
@@ -64,24 +72,17 @@ classdef Net < handle
     end
 
     function Id = createNetwork(this, size)
-%         this.delete()
         Id = 1;
-        this.network = struct( ...
-            'Id', Id, ...
-            'nodes', {cell(1, size)}, ...
-            'nNodes', 0, ...
-            'active', true, ...
-            'deleteCallback', [] ...
-            );
+        this.nodes = cell(1, size);
     end
     
     function nodeId = addNode(this, newNode)
-        nodeId = find(cellfun(@isempty, this.network.nodes), 1, 'first');
+        nodeId = find(cellfun(@isempty, this.nodes), 1, 'first');
         if isempty(nodeId)
             error('No empty cell found in the nodes array.');
         end
         newNode.Id = nodeId;
-        this.network.nodes{nodeId} = newNode;
+        this.nodes{nodeId} = newNode;
     end
 
     function runSchedule(this)
@@ -227,8 +228,13 @@ classdef Net < handle
       if ~isempty(this.Id)
         fprintf('deleting network with id: %d \n' , this.Id)
         notify(this, 'Deleting');
-        this.network = [];
+        this.nodes = [];
       end
+    end
+
+    function count = get.nNodes(this)
+        % Compute the number of non-empty elements in the nodes array
+        count = sum(~cellfun(@isempty, this.nodes));
     end
   end
   
