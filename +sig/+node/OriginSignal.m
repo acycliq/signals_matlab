@@ -70,6 +70,11 @@ classdef OriginSignal < sig.node.Signal
             else
                 % Ensure both inputs have valid values before applying the function
                 if ~isempty(n.Inputs(1).CurrValue) && ~isempty(n.Inputs(2).CurrValue)
+                    % ok, that looks to work but shouldnt I be using mapn
+                    % instead of getting the fun from transArg?
+                    % Also why the second element in transArg is always
+                    % [1]?
+                    disp(n.transArg(2))
                     fun = n.transArg{1};
                     n.CurrValue = fun(n.Inputs(1).CurrValue, n.Inputs(2).CurrValue);
                 end
