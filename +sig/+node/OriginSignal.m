@@ -67,8 +67,6 @@ classdef OriginSignal < sig.node.Signal
             n = topo{j};
             if isempty(n.Inputs)
                 % Do nothing if there are no inputs
-            elseif strcmp(n.transFun, 'sig.transfer.nop')
-                n.value = n.Inputs(1).value;
             else
                 % Ensure both inputs have valid values before applying the function
                 if ~isempty(n.Inputs(1).CurrValue) && ~isempty(n.Inputs(2).CurrValue)
