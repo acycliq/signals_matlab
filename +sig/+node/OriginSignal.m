@@ -72,8 +72,10 @@ classdef OriginSignal < sig.node.Signal
                 if ~isempty(n.Inputs(1).CurrValue) && ~isempty(n.Inputs(2).CurrValue)
                     % ok, that looks to work but shouldnt I be using mapn
                     % instead of getting the fun from transArg?
-                    % Also why the second element in transArg is always
-                    % [1]?
+                    % I think with mapn I should be calling:
+                    % fun = str2fun(n.transFun) 
+                    % [val, valset] = fun(n.NetId, [n.Inputs.Id], n.Id, n.transArg)
+                    % n.CurrValue = val % if this hasnt happened already
                     fun = n.transArg{1};
                     n.CurrValue = fun(n.Inputs(1).CurrValue, n.Inputs(2).CurrValue);
                 end
