@@ -13,6 +13,7 @@ classdef Node < handle
 %     next
     Id
     currNodeValue
+%     workingNodeValue
     Targets % will keep the input nodes (aka children)
   end
   
@@ -96,6 +97,12 @@ classdef Node < handle
     function set.currNodeValue(this, v)
 %       currNodeValue(this.NetId, this.Id, true, v);
       this.currNodeValue = v;
+    end
+
+    function [wv, flag] = workingNodeValue(this)
+    % workingNodeValue  Drop-in stub that always returns no value
+        wv   = [];
+        flag = false;
     end
     
     function b = get.CurrValueSet(this)
