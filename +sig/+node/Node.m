@@ -101,8 +101,8 @@ classdef Node < handle
 
     function [wv, flag] = workingNodeValue(this)
     % workingNodeValue  Drop-in stub that always returns no value
-        wv   = [];
-        flag = false;
+        wv   = this.currNodeValue;
+        flag = true;
     end
     
     function b = get.CurrValueSet(this)
