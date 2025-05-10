@@ -55,12 +55,12 @@ classdef OriginSignal < sig.node.Signal
         if isempty(this.topo)
             this.topo = this.build_topo(this.node);
         else
-            fprintf('Using cached topology.\n');
+%             fprintf('Using cached topology.\n');
         end
 
         topo = this.topo;
 
-        fprintf('Assigning %s = %g\n', this.Name, this.node.currNodeValue);
+%         fprintf('Assigning %s = %g\n', this.Name, this.node.currNodeValue);
 
         % Process nodes in reverse topological order
         for j = length(topo):-1:1
@@ -73,11 +73,11 @@ classdef OriginSignal < sig.node.Signal
                     % ok, that looks to work but shouldnt I be using mapn
                     % instead of getting the fun from transArg?
                     % I think with mapn I should be calling:
-                    % fun = str2fun(n.transFun) 
-                    % [val, valset] = fun(n.NetId, [n.Inputs.Id], n.Id, n.transArg)
-                    % n.CurrValue = val % if this hasnt happened already
-                    fun = n.transArg{1};
-                    n.currNodeValue = fun(n.Inputs(1).currNodeValue, n.Inputs(2).currNodeValue);
+                    fun = str2func(n.transFun);
+                    [val, valset] = fun(n.Net, [n.Inputs.Id], n.Id, n.transArg);
+                    n.currNodeValue = val; % if this hasnt happened already
+                    % fun = n.transArg{1};
+                    % n.currNodeValue = fun(n.Inputs(1).currNodeValue, n.Inputs(2).currNodeValue);
                 end
             end
         end
