@@ -12,7 +12,7 @@ classdef Node < handle
     transArg
 %     next
     Id
-    CurrValue
+    currNodeValue
     Targets % will keep the input nodes (aka children)
   end
   
@@ -88,14 +88,14 @@ classdef Node < handle
       end
     end
     
-    function v = get.CurrValue(this)
+    function v = get.currNodeValue(this)
 %       v = currNodeValue(this.NetId, this.Id, true);
-      v = this.CurrValue;
+      v = this.currNodeValue;
     end
     
-    function set.CurrValue(this, v)
+    function set.currNodeValue(this, v)
 %       currNodeValue(this.NetId, this.Id, true, v);
-      this.CurrValue = v;
+      this.currNodeValue = v;
     end
     
     function b = get.CurrValueSet(this)

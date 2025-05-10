@@ -49,7 +49,7 @@ classdef OriginSignal < sig.node.Signal
 
     function post2(this, value)
         % Assign value and compute forward pass
-        this.node.CurrValue = value;
+        this.node.currNodeValue = value;
 
         % Check if the topological order is already cached
         if isempty(this.topo)
@@ -60,7 +60,7 @@ classdef OriginSignal < sig.node.Signal
 
         topo = this.topo;
 
-        fprintf('Assigning %s = %g\n', this.Name, this.node.CurrValue);
+        fprintf('Assigning %s = %g\n', this.Name, this.node.currNodeValue);
 
         % Process nodes in reverse topological order
         for j = length(topo):-1:1
@@ -69,7 +69,7 @@ classdef OriginSignal < sig.node.Signal
                 % Do nothing if there are no inputs
             else
                 % Ensure both inputs have valid values before applying the function
-                if ~isempty(n.Inputs(1).CurrValue) && ~isempty(n.Inputs(2).CurrValue)
+                if ~isempty(n.Inputs(1).currNodeValue) && ~isempty(n.Inputs(2).currNodeValue)
                     % ok, that looks to work but shouldnt I be using mapn
                     % instead of getting the fun from transArg?
                     % I think with mapn I should be calling:
@@ -77,7 +77,7 @@ classdef OriginSignal < sig.node.Signal
                     % [val, valset] = fun(n.NetId, [n.Inputs.Id], n.Id, n.transArg)
                     % n.CurrValue = val % if this hasnt happened already
                     fun = n.transArg{1};
-                    n.CurrValue = fun(n.Inputs(1).CurrValue, n.Inputs(2).CurrValue);
+                    n.currNodeValue = fun(n.Inputs(1).currNodeValue, n.Inputs(2).currNodeValue);
                 end
             end
         end
