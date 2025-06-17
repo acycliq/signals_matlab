@@ -10,10 +10,8 @@ classdef Node < handle
     Listeners
     transFun
     transArg
-%     next
     Id
-    currNodeValue
-%     workingNodeValue
+    currNodeValue = sig.NotSet()
     Targets % will keep the input nodes (aka children)
   end
   
@@ -85,40 +83,12 @@ classdef Node < handle
       if ~isempty(this.Id)
         fprintf('Deleting node ''%s''\n', this.Name);
         this.Net.nodes{this.Id} = [];
-%         deleteNode(this.NetId, this.Id);
       end
-    end
-    
-    function v = get.currNodeValue(this)
-%       v = currNodeValue(this.NetId, this.Id, true);
-      v = this.currNodeValue;
-    end
-    
-    function set.currNodeValue(this, v)
-%       currNodeValue(this.NetId, this.Id, true, v);
-      this.currNodeValue = v;
     end
 
     function [wv, flag] = workingNodeValue(this)
-    % workingNodeValue  Drop-in stub that always returns no value
         wv   = this.currNodeValue;
-        flag = true;
-    end
-    
-    function b = get.CurrValueSet(this)
-      [~, b] = currNodeValue(this.NetId, this.Id);
-    end
-    
-    function v = get.WorkingValue(this)
-      v = workingNodeValue(this.NetId, this.Id, true);
-    end
-    
-    function set.WorkingValue(this, v)
-      workingNodeValue(this.NetId, this.Id, true, v);
-    end
-    
-    function b = get.WorkingValueSet(this)
-      [~, b] = workingNodeValue(this.NetId, this.Id);
+        flag = ~isa(this.currNodeValue, 'sig.NotSet');
     end
     
     function n = names(those)
@@ -130,14 +100,7 @@ classdef Node < handle
     
     function setInputs(this, nodes)
     end
-% 
-%     function v = get.value(this)
-%         v = this.value;
-%     end
-% 
-%     function set.value(this, v)
-%         this.value = v;
-%     end
+
   end
   
   methods (Access = protected)
