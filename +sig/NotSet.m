@@ -1,4 +1,4 @@
-classdef NotSet < handle
+classdef (Sealed) NotSet
     % Just a empty class
 end
 
