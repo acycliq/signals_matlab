@@ -10,7 +10,7 @@ classdef Node < handle
     Listeners
     transFun
     transArg
-    transferFunHandle  % Function handle for performance
+    transferMethodHandle  % Method handle (developer's approach)
     Id
     currNodeValue = sig.NotSet()
     Targets % will keep the input nodes (aka children)
@@ -64,8 +64,24 @@ classdef Node < handle
       this.transFun = transFun;
       this.transArg = transArg;
       
-      % Create function handle for performance (avoid str2func calls)
-      this.transferFunHandle = str2func(transFun);
+      % Create method reference for transfer functions (optimized approach)
+      C = strsplit(transFun, '.');  % e.g. 'sig.transfer.mapn'
+      if length(C) >= 3 && strcmp(C{1}, 'sig') && strcmp(C{2}, 'transfer')
+        mstr = C{end}; % e.g. 'mapn'
+        % Use fast switch instead of slow ismethod() reflection
+        switch mstr
+          case 'mapn'
+            this.transferMethodHandle = @this.mapn;     % Direct method handle
+          case 'nop'
+            this.transferMethodHandle = @this.nop;      % Direct method handle  
+          case 'identity'
+            this.transferMethodHandle = @this.identity; % Direct method handle
+          otherwise
+            error('Transfer function %s not implemented as Node method', transFun);
+        end
+      else
+        error('Non-transfer function %s not supported', transFun);
+      end
       this.Targets = {};
       this.Net.addNode(this);
     end
@@ -104,6 +120,65 @@ classdef Node < handle
     
     function setInputs(this, nodes)
     end
+    
+    function valset = mapn(this)
+      % MAPN Transfer function as Node method (optimized)
+      % Apply values of inputs through mapn function
+      [f, outnum] = this.transArg{:}; % Get from node property
+      n = numel(this.Inputs);
+      inpvals = cell(n, 1);
+      hasValues = false(n, 1);
+      
+      % Get input values (prefer working values, fall back to current)
+      for inp = 1:n
+        node = this.Inputs(inp);
+        if ~isa(node.currNodeValue, 'sig.NotSet')
+          inpvals{inp} = node.currNodeValue;
+          hasValues(inp) = true;
+        else
+          valset = false;
+          return; % Missing input value, can't compute
+        end
+      end
+      
+      % All inputs have values, apply the function
+      if all(hasValues)
+        try
+          out = cell(1, outnum);
+          [out{:}] = f(inpvals{:});
+          this.currNodeValue = out{end};
+          valset = true;
+        catch ex
+          msg = sprintf('Error in mapn for node %s: %s', this.Name, ex.message);
+          warning(msg);
+          valset = false;
+        end
+      else
+        valset = false;
+      end
+    end
+    
+    function valset = nop(this)
+      % NOP Transfer function - performs no operation
+      % Always returns false (no value set)
+      valset = false;
+    end
+    
+    function valset = identity(this)
+      % IDENTITY Transfer function - passes input value to output
+      if numel(this.Inputs) >= 1
+        input = this.Inputs(1);
+        if ~isa(input.currNodeValue, 'sig.NotSet')
+          this.currNodeValue = input.currNodeValue;
+          valset = true;
+        else
+          valset = false;
+        end
+      else
+        valset = false;
+      end
+    end
+    
 
   end
   
