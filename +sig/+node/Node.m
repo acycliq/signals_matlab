@@ -10,6 +10,7 @@ classdef Node < handle
     Listeners
     transFun
     transArg
+    transferFunHandle  % Function handle for performance
     Id
     currNodeValue = sig.NotSet()
     Targets % will keep the input nodes (aka children)
@@ -62,6 +63,9 @@ classdef Node < handle
       this.NetListeners = event.listener(this.Net, 'Deleting', @this.netDeleted);
       this.transFun = transFun;
       this.transArg = transArg;
+      
+      % Create function handle for performance (avoid str2func calls)
+      this.transferFunHandle = str2func(transFun);
       this.Targets = {};
       this.Net.addNode(this);
     end
