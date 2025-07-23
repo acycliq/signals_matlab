@@ -13,6 +13,7 @@ classdef Node < handle
     transferMethodHandle  % Method handle (developer's approach)
     Id
     currNodeValue = sig.NotSet()
+    hasValue = false           % Boolean flag for value checking
     Targets % will keep the input nodes (aka children)
   end
   
@@ -121,18 +122,24 @@ classdef Node < handle
     function setInputs(this, nodes)
     end
     
+    function setValue(this, value)
+        % Setter that manages both value and flag
+        this.currNodeValue = value;
+        this.hasValue = true;
+    end
+    
     function valset = mapn(this)
-      % MAPN Transfer function as Node method (optimized)
+      % Transfer function as Node method (optimized)
       % Apply values of inputs through mapn function
       [f, outnum] = this.transArg{:}; % Get from node property
       n = numel(this.Inputs);
       inpvals = cell(n, 1);
       hasValues = false(n, 1);
       
-      % Get input values (prefer working values, fall back to current)
+      % Get input values (pure boolean check for maximum performance)
       for inp = 1:n
         node = this.Inputs(inp);
-        if ~isa(node.currNodeValue, 'sig.NotSet')
+        if node.hasValue
           inpvals{inp} = node.currNodeValue;
           hasValues(inp) = true;
         else
@@ -146,7 +153,7 @@ classdef Node < handle
         try
           out = cell(1, outnum);
           [out{:}] = f(inpvals{:});
-          this.currNodeValue = out{end};
+          this.setValue(out{end});  % sets both value and flag
           valset = true;
         catch ex
           msg = sprintf('Error in mapn for node %s: %s', this.Name, ex.message);
@@ -168,8 +175,8 @@ classdef Node < handle
       % IDENTITY Transfer function - passes input value to output
       if numel(this.Inputs) >= 1
         input = this.Inputs(1);
-        if ~isa(input.currNodeValue, 'sig.NotSet')
-          this.currNodeValue = input.currNodeValue;
+        if input.hasValue  % Use boolean check
+          this.setValue(input.currNodeValue);  % call the setter
           valset = true;
         else
           valset = false;

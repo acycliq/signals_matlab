@@ -49,7 +49,7 @@ classdef OriginSignal < sig.node.Signal
 
     function post2(this, value)
         % Assign value and compute forward pass
-        this.node.currNodeValue = value;
+        this.node.setValue(value);  % setter - sets both value and flag
 
         % Check if the topological order is already cached
         if isempty(this.topo)
