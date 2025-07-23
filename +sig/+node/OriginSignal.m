@@ -66,9 +66,8 @@ classdef OriginSignal < sig.node.Signal
 
         affected = {this.node};  % Include origin node in affected list!
                                  % Without this, origin never gets commitWorkingValue() called
-        queue = {this.node};     % nodes whose targets need processing
         
-        % Speedup improvement: Use boolean array instead of expensive containers.Map
+        % OPTIMIZATION 1: Use boolean array instead of expensive containers.Map
         % Get max node ID to pre-allocate boolean array
         maxNodeId = 0;
         for i = 1:length(this.topo)
@@ -77,11 +76,20 @@ classdef OriginSignal < sig.node.Signal
             end
         end
         processed = false(maxNodeId, 1);  % Pre-allocated boolean array - much faster!
+        
+        % OPTIMIZATION 2: Pre-allocated queue with head/tail pointers (eliminates O(n) shifts)
+        maxNodes = length(this.topo);          % Maximum possible queue size
+        queueNodes = cell(maxNodes, 1);        % Pre-allocate queue storage
+        queueHead = 1;                         % Points to next node to dequeue
+        queueTail = 1;                         % Points to next slot to enqueue
+        
+        % Initialize queue with origin node
+        queueNodes{queueTail} = this.node;     % Add origin to queue
+        queueTail = queueTail + 1;             % Move tail pointer
 
-        while ~isempty(queue)
-            % Dequeue next node to process (BFS order)
-            current = queue{1};
-            queue(1) = [];  % Remove first element
+        while queueHead < queueTail  % Queue not empty when head < tail
+            current = queueNodes{queueHead};   % Get next node to process
+            queueHead = queueHead + 1;         % Move head pointer (no array shifting!)
             
             % Process all target nodes of current node
             for i = 1:length(current.Targets)
@@ -99,14 +107,14 @@ classdef OriginSignal < sig.node.Signal
                         if valset
                             % Add to affected nodes list (for application at a later stage)
                             affected{end+1} = target;
-                            
-                            % Add to queue for further propagation to its targets
-                            queue{end+1} = target;
+
+                            queueNodes{queueTail} = target;    % Add to pre-allocated queue
+                            queueTail = queueTail + 1;         % Move tail pointer
                         end
                     end
                     
                     % Mark as processed to avoid revisiting
-                    % Speedup improvement: Direct boolean array assignment - much faster than Map
+                    % OPTIMIZATION 1: Direct boolean array assignment - much faster than Map
                     processed(target.Id) = true;
                 end
             end
