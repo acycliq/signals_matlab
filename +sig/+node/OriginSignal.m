@@ -67,7 +67,16 @@ classdef OriginSignal < sig.node.Signal
         affected = {this.node};  % Include origin node in affected list!
                                  % Without this, origin never gets commitWorkingValue() called
         queue = {this.node};     % nodes whose targets need processing
-        processed = containers.Map('KeyType', 'int32', 'ValueType', 'logical');
+        
+        % Speedup improvement: Use boolean array instead of expensive containers.Map
+        % Get max node ID to pre-allocate boolean array
+        maxNodeId = 0;
+        for i = 1:length(this.topo)
+            if this.topo{i}.Id > maxNodeId
+                maxNodeId = this.topo{i}.Id;
+            end
+        end
+        processed = false(maxNodeId, 1);  % Pre-allocated boolean array - much faster!
 
         while ~isempty(queue)
             % Dequeue next node to process (BFS order)
@@ -79,7 +88,8 @@ classdef OriginSignal < sig.node.Signal
                 target = current.Targets{i};
                 
                 % Skip if we already processed this target node
-                if ~processed.isKey(target.Id)
+                % Speedup improvement: Direct boolean array access instead of expensive isKey()
+                if ~processed(target.Id)
                     % Check if target node can compute (all inputs have values)
                     if this.allInputsReady(target)
                         % Call targets transfer function to compute working value
@@ -96,6 +106,7 @@ classdef OriginSignal < sig.node.Signal
                     end
                     
                     % Mark as processed to avoid revisiting
+                    % Speedup improvement: Direct boolean array assignment - much faster than Map
                     processed(target.Id) = true;
                 end
             end
