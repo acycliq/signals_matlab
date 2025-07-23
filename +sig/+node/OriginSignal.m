@@ -93,7 +93,9 @@ classdef OriginSignal < sig.node.Signal
             queueHead = queueHead + 1;         % Move head pointer (no array shifting!)
             
             % Process all target nodes of current node
-            for i = 1:length(current.Targets)
+            % OPTIMIZATION 6: Cache length to avoid repeated calculations
+            numTargets = length(current.Targets);
+            for i = 1:numTargets
                 target = current.Targets{i};
                 
                 % Skip if we already processed this target node
