@@ -13,7 +13,7 @@ classdef Node < handle
     transferMethodHandle  % Method handle (developer's approach)
     Id
     currNodeValue = sig.NotSet()
-    hasValue = false           % Boolean flag for value checking
+    hasCurrValue = false       % Boolean flag for currNodeValue checking
     Targets % will keep the input nodes (aka children)
   end
   
@@ -122,10 +122,10 @@ classdef Node < handle
     function setInputs(this, nodes)
     end
     
-    function setValue(this, value)
+    function setCurrValue(this, value)
         % Setter that manages both value and flag
         this.currNodeValue = value;
-        this.hasValue = true;
+        this.hasCurrValue = true;
     end
     
     function valset = mapn(this)
@@ -139,7 +139,7 @@ classdef Node < handle
       % Get input values (pure boolean check for maximum performance)
       for inp = 1:n
         node = this.Inputs(inp);
-        if node.hasValue
+        if node.hasCurrValue
           inpvals{inp} = node.currNodeValue;
           hasValues(inp) = true;
         else
@@ -153,7 +153,7 @@ classdef Node < handle
         try
           out = cell(1, outnum);
           [out{:}] = f(inpvals{:});
-          this.setValue(out{end});  % sets both value and flag
+          this.setCurrValue(out{end});  % sets both value and flag
           valset = true;
         catch ex
           msg = sprintf('Error in mapn for node %s: %s', this.Name, ex.message);
@@ -175,8 +175,8 @@ classdef Node < handle
       % IDENTITY Transfer function - passes input value to output
       if numel(this.Inputs) >= 1
         input = this.Inputs(1);
-        if input.hasValue  % Use boolean check
-          this.setValue(input.currNodeValue);  % call the setter
+        if input.hasCurrValue  % Use boolean check
+          this.setCurrValue(input.currNodeValue);  % call the setter
           valset = true;
         else
           valset = false;
