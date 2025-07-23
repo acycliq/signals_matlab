@@ -64,11 +64,8 @@ classdef OriginSignal < sig.node.Signal
         % should be similar to setNodeWorkingValue(node, value) from network.c
         this.node.setWorkingValue(value);
 
-        affected = {this.node};  % Include origin node in affected list!
-                                 % Without this, origin never gets commitWorkingValue() called
-        
-        % OPTIMIZATION 1: Use boolean array instead of expensive containers.Map
-        % Get max node ID to pre-allocate boolean array
+        % OPTIMIZATION 1: Get dimensions for pre-allocation
+        maxNodes = length(this.topo);          % Maximum possible queue/affected size
         maxNodeId = 0;
         for i = 1:length(this.topo)
             if this.topo{i}.Id > maxNodeId
@@ -77,8 +74,12 @@ classdef OriginSignal < sig.node.Signal
         end
         processed = false(maxNodeId, 1);  % Pre-allocated boolean array - much faster!
         
-        % OPTIMIZATION 2: Pre-allocated queue with head/tail pointers (eliminates O(n) shifts)
-        maxNodes = length(this.topo);          % Maximum possible queue size
+        % OPTIMIZATION 2: Pre-allocate affected array (eliminates dynamic growth)
+        affected = cell(maxNodes, 1);         % Pre-allocated cell array
+        affectedCount = 1;                    % Counter for affected nodes
+        affected{affectedCount} = this.node;  % Include origin node in affected list!
+        
+        % OPTIMIZATION 3: Pre-allocated queue with head/tail pointers (eliminates O(n) shifts)
         queueNodes = cell(maxNodes, 1);        % Pre-allocate queue storage
         queueHead = 1;                         % Points to next node to dequeue
         queueTail = 1;                         % Points to next slot to enqueue
@@ -105,8 +106,9 @@ classdef OriginSignal < sig.node.Signal
                         
                         % If transfer function computed a new working value
                         if valset
-                            % Add to affected nodes list (for application at a later stage)
-                            affected{end+1} = target;
+                            % OPTIMIZATION 3: O(1) affected array assignment (vs dynamic growth)
+                            affectedCount = affectedCount + 1;
+                            affected{affectedCount} = target;
 
                             queueNodes{queueTail} = target;    % Add to pre-allocated queue
                             queueTail = queueTail + 1;         % Move tail pointer
@@ -123,7 +125,7 @@ classdef OriginSignal < sig.node.Signal
 
         % Apply working values to current values for all affected nodes
         % This includes the origin node plus all computed nodes
-        for i = 1:length(affected)
+        for i = 1:affectedCount  % Use counter instead of length(affected)
             % Also clears working value: n[currNode].workingValue = NULL in network.c:371
             affected{i}.commitWorkingValue();
         end
