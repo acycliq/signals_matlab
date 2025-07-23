@@ -48,32 +48,65 @@ classdef OriginSignal < sig.node.Signal
     end
 
     function post2(this, value)
-        % Assign value and compute forward pass
-        this.node.setCurrValue(value);  % setter - sets both value and flag
+        % TWO-PHASE WORKING VALUES SYSTEM - Matches MEX submit/applyNodes pattern
+        % Phase 1: Compute working values for affected nodes (like MEX transact)
+        % Phase 2: Copy working values to current values (like MEX sqApply)
 
-        % Check if the topological order is already cached
+        % Cache topology structure for efficient target traversal
         if isempty(this.topo)
             this.topo = this.build_topo(this.node);
-        else
-%             fprintf('Using cached topology.\n');
         end
 
-        topo = this.topo;
+        % Compute working values without modifying current values
+        % Matches MEX transact() function in network.c:659-687
+        
+        % Set working value on origin node (NOT current value!)
+        % should be similar to setNodeWorkingValue(node, value) from network.c
+        this.node.setWorkingValue(value);
 
-%         fprintf('Assigning %s = %g\n', this.Name, this.node.currNodeValue);
+        affected = {this.node};  % Include origin node in affected list!
+                                 % Without this, origin never gets commitWorkingValue() called
+        queue = {this.node};     % nodes whose targets need processing
+        processed = containers.Map('KeyType', 'int32', 'ValueType', 'logical');
 
-        % Process nodes in reverse topological order
-        for j = length(topo):-1:1
-            n = topo{j};
-            if isempty(n.Inputs)
-                % Do nothing if there are no inputs
-            else
-                % Ensure both inputs have valid values before applying the function
-                if ~isempty(n.Inputs(1).currNodeValue) && ~isempty(n.Inputs(2).currNodeValue)
-                    % Always call method handle (no branching for performance)
-                    valset = n.transferMethodHandle();
+        while ~isempty(queue)
+            % Dequeue next node to process (BFS order)
+            current = queue{1};
+            queue(1) = [];  % Remove first element
+            
+            % Process all target nodes of current node
+            for i = 1:length(current.Targets)
+                target = current.Targets{i};
+                
+                % Skip if we already processed this target node
+                if ~processed.isKey(target.Id)
+                    % Check if target node can compute (all inputs have values)
+                    if this.allInputsReady(target)
+                        % Call targets transfer function to compute working value
+                        valset = target.transferMethodHandle();
+                        
+                        % If transfer function computed a new working value
+                        if valset
+                            % Add to affected nodes list (for application at a later stage)
+                            affected{end+1} = target;
+                            
+                            % Add to queue for further propagation to its targets
+                            queue{end+1} = target;
+                        end
+                    end
+                    
+                    % Mark as processed to avoid revisiting
+                    processed(target.Id) = true;
                 end
             end
+        end
+        
+
+        % Apply working values to current values for all affected nodes
+        % This includes the origin node plus all computed nodes
+        for i = 1:length(affected)
+            % Also clears working value: n[currNode].workingValue = NULL in network.c:371
+            affected{i}.commitWorkingValue();
         end
     end
 
@@ -107,6 +140,24 @@ classdef OriginSignal < sig.node.Signal
         [value, delay] = value{:};
       end
       this.Node.Net.Schedule(end+1) = struct('nodeid', this.Node.Id, 'value', value, 'when', t + delay);
+    end
+    
+    function ready = allInputsReady(this, node)
+        % CHECK IF ALL INPUTS OF A NODE HAVE CURRENT VALUES
+        % Used to determine if a node can compute its transfer function
+
+        ready = true;  % Assume ready until proven otherwise
+        
+        % Check each input node individually
+        for i = 1:length(node.Inputs)
+            if ~node.Inputs(i).hasCurrValue
+                ready = false;  % Found unready input
+                return;
+            end
+        end
+        
+        % If we get here, all inputs are ready
+        % ready = true (already set above)
     end
   end
 

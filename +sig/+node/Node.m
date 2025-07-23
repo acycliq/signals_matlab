@@ -14,6 +14,8 @@ classdef Node < handle
     Id
     currNodeValue = sig.NotSet()
     hasCurrValue = false       % Boolean flag for currNodeValue checking
+    workingValue = sig.NotSet() % Working value for two-phase computation
+    hasWorkingValue = false    % Boolean flag for workingValue checking
     Targets % will keep the input nodes (aka children)
   end
   
@@ -128,8 +130,24 @@ classdef Node < handle
         this.hasCurrValue = true;
     end
     
+    function setWorkingValue(this, value)
+        % Setter for working values in two-phase computation
+        this.workingValue = value;
+        this.hasWorkingValue = true;
+    end
+    
+    function commitWorkingValue(this)
+        % Copy working value to current value and clear (like MEX)
+        if this.hasWorkingValue
+            this.setCurrValue(this.workingValue);
+            % Clear working value after application (like MEX does)
+            this.workingValue = sig.NotSet();
+            this.hasWorkingValue = false;
+        end
+    end
+    
     function valset = mapn(this)
-      % Transfer function as Node method (optimized)
+      % Transfer function as Node method (two-phase working values)
       % Apply values of inputs through mapn function
       [f, outnum] = this.transArg{:}; % Get from node property
       n = numel(this.Inputs);
@@ -153,7 +171,7 @@ classdef Node < handle
         try
           out = cell(1, outnum);
           [out{:}] = f(inpvals{:});
-          this.setCurrValue(out{end});  % sets both value and flag
+          this.setWorkingValue(out{end});  % Store in working value (phase 1)
           valset = true;
         catch ex
           msg = sprintf('Error in mapn for node %s: %s', this.Name, ex.message);
@@ -172,11 +190,11 @@ classdef Node < handle
     end
     
     function valset = identity(this)
-      % IDENTITY Transfer function - passes input value to output
+      % IDENTITY Transfer function - passes input value to output (two-phase)
       if numel(this.Inputs) >= 1
         input = this.Inputs(1);
         if input.hasCurrValue  % Use boolean check
-          this.setCurrValue(input.currNodeValue);  % call the setter
+          this.setWorkingValue(input.currNodeValue);  % Store in working value
           valset = true;
         else
           valset = false;
