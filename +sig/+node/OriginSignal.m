@@ -65,21 +65,14 @@ classdef OriginSignal < sig.node.Signal
         this.node.setWorkingValue(value);
 
         % OPTIMIZATION 1: Get dimensions for pre-allocation
-        topoLength = length(this.topo);
-        maxNodes = topoLength;                 % Maximum possible queue/affected size
-        
-        % OPTIMIZATION 5: More efficient maxNodeId calculation
-        if topoLength > 0
-            % Pre-allocate array for node IDs and fill in single loop
-            nodeIds = zeros(topoLength, 1);
-            for i = 1:topoLength
-                nodeIds(i) = this.topo{i}.Id;
+        maxNodes = length(this.topo);          % Maximum possible queue/affected size
+        maxNodeId = 0;
+        for i = 1:length(this.topo)
+            if this.topo{i}.Id > maxNodeId
+                maxNodeId = this.topo{i}.Id;
             end
-            maxNodeId = max(nodeIds);          % Vectorized max operation
-        else
-            maxNodeId = 1;                     % Fallback for empty topology
         end
-        processed = false(maxNodeId, 1);       % Pre-allocated boolean array
+        processed = false(maxNodeId, 1);  % Pre-allocated boolean array - much faster!
         
         % OPTIMIZATION 2: Pre-allocate affected array (eliminates dynamic growth)
         affected = cell(maxNodes, 1);         % Pre-allocated cell array
