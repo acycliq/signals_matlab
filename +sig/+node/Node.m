@@ -152,33 +152,27 @@ classdef Node < handle
       [f, outnum] = this.transArg{:}; % Get from node property
       n = numel(this.Inputs);
       inpvals = cell(n, 1);
-      hasValues = false(n, 1);
       
       % Get input values (pure boolean check for maximum performance)
       for inp = 1:n
         node = this.Inputs(inp);
         if node.hasCurrValue
           inpvals{inp} = node.currNodeValue;
-          hasValues(inp) = true;
         else
           valset = false;
           return; % Missing input value, can't compute
         end
       end
       
-      % All inputs have values, apply the function
-      if all(hasValues)
-        try
-          out = cell(1, outnum);
-          [out{:}] = f(inpvals{:});
-          this.setWorkingValue(out{end});  % Store in working value (phase 1)
-          valset = true;
-        catch ex
-          msg = sprintf('Error in mapn for node %s: %s', this.Name, ex.message);
-          warning(msg);
-          valset = false;
-        end
-      else
+      % All inputs have values, apply the function directly
+      try
+        out = cell(1, outnum);
+        [out{:}] = f(inpvals{:});
+        this.setWorkingValue(out{end});  % Store in working value (phase 1)
+        valset = true;
+      catch ex
+        msg = sprintf('Error in mapn for node %s: %s', this.Name, ex.message);
+        warning(msg);
         valset = false;
       end
     end
