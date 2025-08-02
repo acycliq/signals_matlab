@@ -12,8 +12,8 @@ classdef Node < handle
     transArg
     transferMethodHandle  % Method handle (developer's approach)
     Id
-    currNodeValue = sig.NotSet()
-    hasCurrValue = false       % Boolean flag for currNodeValue checking
+    currValue = sig.NotSet()
+    hasCurrValue = false       % Boolean flag for currValue checking
     workingValue = sig.NotSet() % Working value for two-phase computation
     hasWorkingValue = false    % Boolean flag for workingValue checking
     Targets % will keep the input nodes (aka children)
@@ -30,9 +30,6 @@ classdef Node < handle
   
   properties (Dependent)
     Name
-    CurrValueSet
-    WorkingValue
-    WorkingValueSet
   end
   
   properties (Access = private)
@@ -109,10 +106,6 @@ classdef Node < handle
       end
     end
 
-    function [wv, flag] = workingNodeValue(this)
-        wv   = this.currNodeValue;
-        flag = ~isa(this.currNodeValue, 'sig.NotSet');
-    end
     
     function n = names(those)
       n = cell(numel(those), 1);
@@ -126,7 +119,7 @@ classdef Node < handle
     
     function setCurrValue(this, value)
         % Setter that manages both value and flag
-        this.currNodeValue = value;
+        this.currValue = value;
         this.hasCurrValue = true;
     end
     
@@ -157,7 +150,7 @@ classdef Node < handle
       for inp = 1:n
         node = this.Inputs(inp);
         if node.hasCurrValue
-          inpvals{inp} = node.currNodeValue;
+          inpvals{inp} = node.currValue;
         else
           valset = false;
           return; % Missing input value, can't compute
@@ -188,7 +181,7 @@ classdef Node < handle
       if numel(this.Inputs) >= 1
         input = this.Inputs(1);
         if input.hasCurrValue  % Use boolean check
-          this.setWorkingValue(input.currNodeValue);  % Store in working value
+          this.setWorkingValue(input.currValue);  % Store in working value
           valset = true;
         else
           valset = false;
