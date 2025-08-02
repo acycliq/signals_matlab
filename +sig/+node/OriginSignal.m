@@ -54,66 +54,19 @@ classdef OriginSignal < sig.node.Signal
         % Start by setting the working value on the origin node
         this.node.setWorkingValue(value);
         
-        % Keep track of nodes that will be affected by this change
-        affectedNodes = {this.node};  % start with just the origin
-        processedNodeIds = [];        % track what you've already processed
+        % Propagate changes through the network
+        affectedNodes = {this.node};
+        processedIds = [];
         
-        % Keep going until you don't find any new nodes to process
         foundNewNodes = true;
         while foundNewNodes
-            foundNewNodes = false;
-            newNodes = {};
-            
-            % Go through each node in the affected list
-            for i = 1:length(affectedNodes)
-                currentNode = affectedNodes{i};
-                
-                % Skip nodes you've already processed
-                if any(processedNodeIds == currentNode.Id)
-                    continue;
-                end
-                
-                % Mark this one as done
-                processedNodeIds(end+1) = currentNode.Id;
-                
-                % Now look at all the nodes that depend on this one
-                for j = 1:length(currentNode.Targets)
-                    targetNode = currentNode.Targets{j};
-                    
-                    % Don't add the same node twice to the list
-                    alreadyKnown = false;
-                    for k = 1:length(affectedNodes)
-                        if affectedNodes{k}.Id == targetNode.Id
-                            alreadyKnown = true;
-                            break;
-                        end
-                    end
-                    if alreadyKnown
-                        continue;
-                    end
-                    
-                    % See if this target can actually compute something
-                    if this.allInputsReady(targetNode)
-                        % Try to run the transfer function
-                        wasComputed = targetNode.transferMethodHandle();
-                        
-                        if wasComputed
-                            % Great, this node computed something new
-                            newNodes{end+1} = targetNode;
-                            foundNewNodes = true;
-                        end
-                    end
-                end
-            end
-            
-            % Add whatever new nodes you found this round
+            [newNodes, processedIds] = this.processNode(affectedNodes, processedIds);
             affectedNodes = [affectedNodes, newNodes];
+            foundNewNodes = ~isempty(newNodes);
         end
         
-        % Finally, apply all the working values to current values
-        for i = 1:length(affectedNodes)
-            affectedNodes{i}.commitWorkingValue();
-        end
+        % Apply all the working values
+        this.applyWorkingValues(affectedNodes);
     end
 
 
@@ -164,6 +117,66 @@ classdef OriginSignal < sig.node.Signal
         
         % If we get here, all inputs are ready
         % ready = true (already set above)
+    end
+    function [newNodes, processedIds] = processNode(this, affectedNodes, processedIds)
+        % Process current affected nodes and find new ones that can compute
+        newNodes = {};
+        
+        for i = 1:length(affectedNodes)
+            curr = affectedNodes{i};
+            
+            % Skip if already processed
+            if any(processedIds == curr.Id)
+                continue;
+            end
+            
+            % Mark as processed
+            processedIds(end+1) = curr.Id;
+            
+            % Check targets of this node
+            newTargets = this.processTargets(curr, affectedNodes);
+            newNodes = [newNodes, newTargets];
+        end
+    end
+    
+    function newTargets = processTargets(this, currentNode, affectedNodes)
+        % Check all targets of current node and see which ones can compute
+        newTargets = {};
+        
+        for j = 1:length(currentNode.Targets)
+            target = currentNode.Targets{j};
+            
+            % Skip if already in affected list
+            if this.isNodeInList(target, affectedNodes)
+                continue;
+            end
+            
+            % Try to compute this target
+            if this.allInputsReady(target)
+                computed = target.transferMethodHandle();
+                if computed
+                    newTargets{end+1} = target;
+                end
+            end
+        end
+    end
+    
+    function found = isNodeInList(this, targetNode, nodeList)
+        % Check if a node is already in the list (avoid duplicates)
+        found = false;
+        for k = 1:length(nodeList)
+            if nodeList{k}.Id == targetNode.Id
+                found = true;
+                return;
+            end
+        end
+    end
+    
+    function applyWorkingValues(this, affectedNodes)
+        % Apply all working values to current values
+        for i = 1:length(affectedNodes)
+            affectedNodes{i}.commitWorkingValue();
+        end
     end
   end
 
