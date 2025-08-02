@@ -48,88 +48,71 @@ classdef OriginSignal < sig.node.Signal
     end
 
     function post2(this, value)
-        % TWO-PHASE WORKING VALUES SYSTEM - Matches MEX submit/applyNodes pattern
-        % Phase 1: Compute working values for affected nodes (like MEX transact)
-        % Phase 2: Copy working values to current values (like MEX sqApply)
-
-        % Cache topology structure for efficient target traversal
-        if isempty(this.topo)
-            this.topo = this.build_topo(this.node);
-        end
-
-        % Compute working values without modifying current values
-        % Matches MEX transact() function in network.c:659-687
+        % Pure matlab version to replace mexnet submit/applyNodes
+        % Two phases: first compute all working values, then apply them
         
-        % Set working value on origin node (NOT current value!)
-        % should be similar to setNodeWorkingValue(node, value) from network.c
+        % Start by setting the working value on the origin node
         this.node.setWorkingValue(value);
-
-        % OPTIMIZATION 1: Get dimensions for pre-allocation
-        maxNodes = length(this.topo);          % Maximum possible queue/affected size
-        maxNodeId = 0;
-        for i = 1:length(this.topo)
-            if this.topo{i}.Id > maxNodeId
-                maxNodeId = this.topo{i}.Id;
-            end
-        end
-        processed = false(maxNodeId, 1);  % Pre-allocated boolean array - much faster!
         
-        % OPTIMIZATION 2: Pre-allocate affected array (eliminates dynamic growth)
-        affected = cell(maxNodes, 1);         % Pre-allocated cell array
-        affectedCount = 1;                    % Counter for affected nodes
-        affected{affectedCount} = this.node;  % Include origin node in affected list!
+        % Keep track of nodes that will be affected by this change
+        affectedNodes = {this.node};  % start with just the origin
+        processedNodeIds = [];        % track what you've already processed
         
-        % OPTIMIZATION 3: Pre-allocated queue with head/tail pointers (eliminates O(n) shifts)
-        queueNodes = cell(maxNodes, 1);        % Pre-allocate queue storage
-        queueHead = 1;                         % Points to next node to dequeue
-        queueTail = 1;                         % Points to next slot to enqueue
-        
-        % Initialize queue with origin node
-        queueNodes{queueTail} = this.node;     % Add origin to queue
-        queueTail = queueTail + 1;             % Move tail pointer
-
-        while queueHead < queueTail  % Queue not empty when head < tail
-            current = queueNodes{queueHead};   % Get next node to process
-            queueHead = queueHead + 1;         % Move head pointer (no array shifting!)
+        % Keep going until you don't find any new nodes to process
+        foundNewNodes = true;
+        while foundNewNodes
+            foundNewNodes = false;
+            newNodes = {};
             
-            % Process all target nodes of current node
-            % OPTIMIZATION 6: Cache length to avoid repeated calculations
-            numTargets = length(current.Targets);
-            for i = 1:numTargets
-                target = current.Targets{i};
+            % Go through each node in the affected list
+            for i = 1:length(affectedNodes)
+                currentNode = affectedNodes{i};
                 
-                % Skip if we already processed this target node
-                % Speedup improvement: Direct boolean array access instead of expensive isKey()
-                if ~processed(target.Id)
-                    % Check if target node can compute (all inputs have values)
-                    if this.allInputsReady(target)
-                        % Call targets transfer function to compute working value
-                        valset = target.transferMethodHandle();
-                        
-                        % If transfer function computed a new working value
-                        if valset
-                            % OPTIMIZATION 3: O(1) affected array assignment (vs dynamic growth)
-                            affectedCount = affectedCount + 1;
-                            affected{affectedCount} = target;
-
-                            queueNodes{queueTail} = target;    % Add to pre-allocated queue
-                            queueTail = queueTail + 1;         % Move tail pointer
+                % Skip nodes you've already processed
+                if any(processedNodeIds == currentNode.Id)
+                    continue;
+                end
+                
+                % Mark this one as done
+                processedNodeIds(end+1) = currentNode.Id;
+                
+                % Now look at all the nodes that depend on this one
+                for j = 1:length(currentNode.Targets)
+                    targetNode = currentNode.Targets{j};
+                    
+                    % Don't add the same node twice to the list
+                    alreadyKnown = false;
+                    for k = 1:length(affectedNodes)
+                        if affectedNodes{k}.Id == targetNode.Id
+                            alreadyKnown = true;
+                            break;
                         end
                     end
+                    if alreadyKnown
+                        continue;
+                    end
                     
-                    % Mark as processed to avoid revisiting
-                    % OPTIMIZATION 1: Direct boolean array assignment - much faster than Map
-                    processed(target.Id) = true;
+                    % See if this target can actually compute something
+                    if this.allInputsReady(targetNode)
+                        % Try to run the transfer function
+                        wasComputed = targetNode.transferMethodHandle();
+                        
+                        if wasComputed
+                            % Great, this node computed something new
+                            newNodes{end+1} = targetNode;
+                            foundNewNodes = true;
+                        end
+                    end
                 end
             end
+            
+            % Add whatever new nodes you found this round
+            affectedNodes = [affectedNodes, newNodes];
         end
         
-
-        % Apply working values to current values for all affected nodes
-        % This includes the origin node plus all computed nodes
-        for i = 1:affectedCount  % Use counter instead of length(affected)
-            % Also clears working value: n[currNode].workingValue = NULL in network.c:371
-            affected{i}.commitWorkingValue();
+        % Finally, apply all the working values to current values
+        for i = 1:length(affectedNodes)
+            affectedNodes{i}.commitWorkingValue();
         end
     end
 
