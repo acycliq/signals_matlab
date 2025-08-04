@@ -109,7 +109,7 @@ classdef OriginSignal < sig.node.Signal
         
         % Check each input node individually
         for i = 1:length(node.Inputs)
-            if ~node.Inputs(i).hasCurrValue
+            if node.Inputs(i).currValue == sig.Nil.instance()
                 ready = false;  % Found unready input
                 return;
             end

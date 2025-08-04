@@ -12,10 +12,8 @@ classdef Node < handle
     transArg
     transferMethodHandle  % Method handle
     Id
-    currValue = sig.NotSet()
-    hasCurrValue = false       % Boolean flag for currValue checking
-    workingValue = sig.NotSet() % Working value for two-phase computation
-    hasWorkingValue = false    % Boolean flag for workingValue checking
+    currValue = sig.Nil.instance()
+    workingValue = sig.Nil.instance() % Working value for two-phase computation
     Targets % will keep the input nodes (aka children)
   end
   
@@ -117,24 +115,21 @@ classdef Node < handle
     end
     
     function setCurrValue(this, value)
-        % Setter that manages both value and flag
+        % Setter for current values
         this.currValue = value;
-        this.hasCurrValue = true;
     end
     
     function setWorkingValue(this, value)
         % Setter for working values in two-phase computation
         this.workingValue = value;
-        this.hasWorkingValue = true;
     end
     
     function commitWorkingValue(this)
         % Copy working value to current value and clear (like MEX)
-        if this.hasWorkingValue
+        if this.workingValue ~= sig.Nil.instance()
             this.setCurrValue(this.workingValue);
             % Clear working value after application (like MEX does)
-            this.workingValue = sig.NotSet();
-            this.hasWorkingValue = false;
+            this.workingValue = sig.Nil.instance();
         end
     end
     
@@ -145,10 +140,10 @@ classdef Node < handle
       n = numel(this.Inputs);
       inpvals = cell(n, 1);
       
-      % Get input values (pure boolean check for maximum performance)
+      % Get input values
       for inp = 1:n
         node = this.Inputs(inp);
-        if node.hasCurrValue
+        if node.currValue ~= sig.Nil.instance()
           inpvals{inp} = node.currValue;
         else
           valset = false;
@@ -179,7 +174,7 @@ classdef Node < handle
       % IDENTITY Transfer function - passes input value to output (two-phase)
       if numel(this.Inputs) >= 1
         input = this.Inputs(1);
-        if input.hasCurrValue  % Use boolean check
+        if input.currValue ~= sig.Nil.instance()  % Use singleton comparison
           this.setWorkingValue(input.currValue);  % Store in working value
           valset = true;
         else
