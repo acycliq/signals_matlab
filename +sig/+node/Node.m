@@ -64,11 +64,10 @@ classdef Node < handle
       this.transFun = transFun;
       this.transArg = transArg;
       
-      % Create method reference for transfer functions (optimized approach)
-      C = strsplit(transFun, '.');  % e.g. 'sig.transfer.mapn'
+      % Create method reference for transfer function
+      C = strsplit(transFun, '.');  % for example strip-split: 'sig.transfer.mapn'
       if length(C) >= 3 && strcmp(C{1}, 'sig') && strcmp(C{2}, 'transfer')
         mstr = C{end}; % e.g. 'mapn'
-        % Use fast switch instead of slow ismethod() reflection
         switch mstr
           case 'mapn'
             this.transferMethodHandle = @this.mapn;     % Direct method handle
