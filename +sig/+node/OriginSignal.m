@@ -56,12 +56,18 @@ classdef OriginSignal < sig.node.Signal
         
         % Propagate changes through the network
         affectedNodes = {this.node};
+        affectedNodeIds = containers.Map('KeyType', 'int32', 'ValueType', 'logical');
+        affectedNodeIds(this.node.Id) = true;  
         processedIds = [];
         
         foundNewNodes = true;
         while foundNewNodes
-            [newNodes, processedIds] = this.processNode(affectedNodes, processedIds);
-            affectedNodes = [affectedNodes, newNodes];
+            [newNodes, processedIds] = this.processNode(affectedNodes, affectedNodeIds, processedIds);
+            % Add new nodes to both list and map
+            for i = 1:length(newNodes)
+                affectedNodes{end+1} = newNodes{i};
+                affectedNodeIds(newNodes{i}.Id) = true;
+            end
             foundNewNodes = ~isempty(newNodes);
         end
         
@@ -118,7 +124,7 @@ classdef OriginSignal < sig.node.Signal
         % If we get here, all inputs are ready
         % ready = true (already set above)
     end
-    function [newNodes, processedIds] = processNode(this, affectedNodes, processedIds)
+    function [newNodes, processedIds] = processNode(this, affectedNodes, affectedNodeIds, processedIds)
         % Process current affected nodes and find new ones that can compute
         newNodes = {};
         
@@ -134,20 +140,20 @@ classdef OriginSignal < sig.node.Signal
             processedIds(end+1) = curr.Id;
             
             % Check targets of this node
-            newTargets = this.processTargets(curr, affectedNodes);
+            newTargets = this.processTargets(curr, affectedNodeIds);
             newNodes = [newNodes, newTargets];
         end
     end
     
-    function newTargets = processTargets(this, currentNode, affectedNodes)
+    function newTargets = processTargets(this, currentNode, affectedNodeIds)
         % Check all targets of current node and see which ones can compute
         newTargets = {};
         
         for j = 1:length(currentNode.Targets)
             target = currentNode.Targets{j};
             
-            % Skip if already in affected list
-            if this.isNodeInList(target, affectedNodes)
+            % Skip if already in affected list (O(1) lookup)
+            if affectedNodeIds.isKey(target.Id)
                 continue;
             end
             
@@ -161,16 +167,6 @@ classdef OriginSignal < sig.node.Signal
         end
     end
     
-    function found = isNodeInList(this, targetNode, nodeList)
-        % Check if a node is already in the list (avoid duplicates)
-        found = false;
-        for k = 1:length(nodeList)
-            if nodeList{k}.Id == targetNode.Id
-                found = true;
-                return;
-            end
-        end
-    end
     
     function applyWorkingValues(this, affectedNodes)
         % Apply all working values to current values

@@ -62,19 +62,21 @@ classdef Node < handle
       this.transFun = transFun;
       this.transArg = transArg;
       
-      % Create method reference for transfer function
+      % Create method reference for transfer function dynamically
       C = strsplit(transFun, '.');  % for example strip-split: 'sig.transfer.mapn'
       if length(C) >= 3 && strcmp(C{1}, 'sig') && strcmp(C{2}, 'transfer')
         mstr = C{end}; % e.g. 'mapn'
-        switch mstr
-          case 'mapn'
-            this.transferMethodHandle = @this.mapn;     % Direct method handle
-          case 'nop'
-            this.transferMethodHandle = @this.nop;      % Direct method handle  
-          case 'identity'
-            this.transferMethodHandle = @this.identity; % Direct method handle
-          otherwise
-            error('Transfer function %s not implemented as Node method', transFun);
+        try
+          % Check if method exists on this object
+          if ismethod(this, mstr)
+            % Create method handle properly - str2func gets the method, @ binds to object
+            methodFunc = str2func(mstr);
+            this.transferMethodHandle = @() methodFunc(this);
+          else
+            error('Transfer function method %s not found on Node class', mstr);
+          end
+        catch ex
+          error('Failed to create method handle for %s: %s', transFun, ex.message);
         end
       else
         error('Non-transfer function %s not supported', transFun);
