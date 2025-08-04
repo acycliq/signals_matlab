@@ -10,7 +10,7 @@ classdef Node < handle
     Listeners
     transFun
     transArg
-    transferMethodHandle  % Method handle (developer's approach)
+    transferMethodHandle  % Method handle
     Id
     currValue = sig.NotSet()
     hasCurrValue = false       % Boolean flag for currValue checking
