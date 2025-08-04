@@ -139,19 +139,33 @@ classdef Node < handle
       [f, outnum] = this.transArg{:}; % Get from node property
       n = numel(this.Inputs);
       inpvals = cell(n, 1);
+      hasWorkingValue = false(n, 1);  % Track which inputs have working values
       
-      % Get input values
+      % Check each input: working value first, then current value
       for inp = 1:n
         node = this.Inputs(inp);
-        if node.currValue ~= sig.Nil.instance()
+        if node.workingValue ~= sig.Nil.instance()
+          % Input has a working value (new value)
+          inpvals{inp} = node.workingValue;
+          hasWorkingValue(inp) = true;
+        elseif node.currValue ~= sig.Nil.instance()
+          % Fall back to current value (old value)
           inpvals{inp} = node.currValue;
+          hasWorkingValue(inp) = false;
         else
+          % No value at all - can't compute
           valset = false;
-          return; % Missing input value, can't compute
+          return;
         end
       end
       
-      % All inputs have values, apply the function directly
+      % Only proceed if at least one input has a working value (new value)
+      if ~any(hasWorkingValue)
+        valset = false;
+        return;
+      end
+      
+      % All inputs have values and at least one is new - apply the function
       try
         out = cell(1, outnum);
         [out{:}] = f(inpvals{:});
@@ -174,10 +188,18 @@ classdef Node < handle
       % IDENTITY Transfer function - passes input value to output (two-phase)
       if numel(this.Inputs) >= 1
         input = this.Inputs(1);
-        if input.currValue ~= sig.Nil.instance()  % Use singleton comparison
-          this.setWorkingValue(input.currValue);  % Store in working value
+        
+        % Check working value first, then current value
+        if input.workingValue ~= sig.Nil.instance()
+          % Input has a working value (new value) - use it
+          this.setWorkingValue(input.workingValue);
           valset = true;
+        elseif input.currValue ~= sig.Nil.instance()
+          % Fall back to current value, but only if no working value exists
+          % This means the input hasn't changed, so we shouldn't compute
+          valset = false;
         else
+          % No value at all
           valset = false;
         end
       else
