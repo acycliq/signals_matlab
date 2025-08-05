@@ -57,7 +57,11 @@ classdef OriginSignal < sig.node.Signal
         
         % Queue origin node's targets (like MEX QUEUE_PUT_ALL line 669)
         for i = 1:length(this.node.Targets)
-            queue{end+1} = this.node.Targets{i};
+            target = this.node.Targets{i};
+            if ~target.queued                    % MEX: if (!(vals)[i]->queued)
+                queue{end+1} = target;
+                target.queued = true;            % MEX: (vals)[i]->queued = true
+            end
         end
         affected{end+1} = this.node;  % Add origin to affected list (like MEX line 670)
         
@@ -65,6 +69,7 @@ classdef OriginSignal < sig.node.Signal
         while ~isempty(queue)
             curr = queue{1};        % Get next node from front (like MEX QUEUE_GET)
             queue(1) = [];          % Remove from front of queue
+            curr.queued = false;    % MEX: curr->queued = false (line 673)
             
             % Try to compute current node (like MEX transfer(curr) line 676)
             if this.allInputsReady(curr)
@@ -75,7 +80,11 @@ classdef OriginSignal < sig.node.Signal
                     
                     % Queue all targets (like MEX QUEUE_PUT_ALL line 682)
                     for j = 1:length(curr.Targets)
-                        queue{end+1} = curr.Targets{j};
+                        target = curr.Targets{j};
+                        if ~target.queued                % MEX: if (!(vals)[i]->queued)
+                            queue{end+1} = target;
+                            target.queued = true;        % MEX: (vals)[i]->queued = true
+                        end
                     end
                 end
             end

@@ -14,6 +14,8 @@ classdef Node < handle
     Id
     currValue = sig.Nil.instance()
     workingValue = sig.Nil.instance() % Working value for two-phase computation
+    queued = false       % MEX-style queued flag: true if node is currently in processing queue, false otherwise
+                        % Prevents duplicate queuing during signal propagation (matches MEX network.c behavior)
     Targets % will keep the input nodes (aka children)
   end
   
