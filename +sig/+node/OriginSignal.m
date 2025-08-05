@@ -2,9 +2,6 @@ classdef OriginSignal < sig.node.Signal
   % SIG.NODE.ORIGINSIGNAL An input Signal class
   %   A subclass that provides methods for directly setting the signal's
   %   value.
- properties (Access = private)
-     topo = [];  % Initialize as empty. It will keep the topological map of the network
- end
   
   methods
     function this = OriginSignal(node)
@@ -48,31 +45,44 @@ classdef OriginSignal < sig.node.Signal
     end
 
     function post2(this, value)
-        % Pure matlab version to replace mexnet submit/applyNodes
-        % Two phases: first compute all working values, then apply them
+        % Pure MATLAB version replicating MEX transact philosophy (network.c:659-687)
+        % Uses queue-based processing with natural dependency ordering
         
-        % Start by setting the working value on the origin node
+        % Set working value on origin node (like MEX setNodeWorkingValue)
         this.node.setWorkingValue(value);
         
-        % Propagate changes through the network
-        affectedNodes = {this.node};
-        affectedNodeIds = containers.Map('KeyType', 'int32', 'ValueType', 'logical');
-        affectedNodeIds(this.node.Id) = true;  
-        processedIds = [];
+        % Initialize queue and affected list (like MEX QUEUE_ALLOC/STACK_ALLOC)
+        queue = {};      % Processing queue (like MEX todo queue)
+        affected = {};   % List of affected nodes (like MEX affected stack)
         
-        foundNewNodes = true;
-        while foundNewNodes
-            [newNodes, processedIds] = this.processNode(affectedNodes, affectedNodeIds, processedIds);
-            % Add new nodes to both list and map
-            for i = 1:length(newNodes)
-                affectedNodes{end+1} = newNodes{i};
-                affectedNodeIds(newNodes{i}.Id) = true;
+        % Queue origin node's targets (like MEX QUEUE_PUT_ALL line 669)
+        for i = 1:length(this.node.Targets)
+            queue{end+1} = this.node.Targets{i};
+        end
+        affected{end+1} = this.node;  % Add origin to affected list (like MEX line 670)
+        
+        % Process queue until empty (like MEX while (!QUEUE_IS_EMPTY(todo)) line 671)
+        while ~isempty(queue)
+            curr = queue{1};        % Get next node from front (like MEX QUEUE_GET)
+            queue(1) = [];          % Remove from front of queue
+            
+            % Try to compute current node (like MEX transfer(curr) line 676)
+            if this.allInputsReady(curr)
+                computed = curr.transferMethodHandle();
+                
+                if computed  % If node computed new value (like MEX if (propagate) line 678)
+                    affected{end+1} = curr;  % Add to affected list (like MEX line 680)
+                    
+                    % Queue all targets (like MEX QUEUE_PUT_ALL line 682)
+                    for j = 1:length(curr.Targets)
+                        queue{end+1} = curr.Targets{j};
+                    end
+                end
             end
-            foundNewNodes = ~isempty(newNodes);
         end
         
-        % Apply all the working values
-        this.applyWorkingValues(affectedNodes);
+        % Apply all working values (like MEX sqApply)
+        this.applyWorkingValues(affected);
     end
 
 
@@ -124,49 +134,6 @@ classdef OriginSignal < sig.node.Signal
         % If we get here, all inputs are ready
         % ready = true (already set above)
     end
-    function [newNodes, processedIds] = processNode(this, affectedNodes, affectedNodeIds, processedIds)
-        % Process current affected nodes and find new ones that can compute
-        newNodes = {};
-        
-        for i = 1:length(affectedNodes)
-            curr = affectedNodes{i};
-            
-            % Skip if already processed
-            if any(processedIds == curr.Id)
-                continue;
-            end
-            
-            % Mark as processed
-            processedIds(end+1) = curr.Id;
-            
-            % Check targets of this node
-            newTargets = this.processTargets(curr, affectedNodeIds);
-            newNodes = [newNodes, newTargets];
-        end
-    end
-    
-    function newTargets = processTargets(this, currentNode, affectedNodeIds)
-        % Check all targets of current node and see which ones can compute
-        newTargets = {};
-        
-        for j = 1:length(currentNode.Targets)
-            target = currentNode.Targets{j};
-            
-            % Skip if already in affected list (O(1) lookup)
-            if affectedNodeIds.isKey(target.Id)
-                continue;
-            end
-            
-            % Try to compute this target
-            if this.allInputsReady(target)
-                computed = target.transferMethodHandle();
-                if computed
-                    newTargets{end+1} = target;
-                end
-            end
-        end
-    end
-    
     
     function applyWorkingValues(this, affectedNodes)
         % Apply all working values to current values
@@ -174,33 +141,6 @@ classdef OriginSignal < sig.node.Signal
             affectedNodes{i}.commitWorkingValue();
         end
     end
-  end
-
-  methods (Access = private)
-      function topo = build_topo(this, node)
-          % build_topo Computes the topological ordering of nodes
-          %
-          %   topo = build_topo(node) traverses the network starting
-          %   from 'node', collecting nodes in a topological order so that
-          %   each node's dependencies are processed before the node itself.
-
-          visited = {};
-          topo = {};
-
-          % Recursive helper function to perform the traversal.
-          function recursive_topo(n)
-              if ~any(cellfun(@(x) x == n, visited))
-                  visited{end+1} = n;
-                  for i = 1:length(n.Targets)
-                      recursive_topo(n.Targets{i});
-                  end
-                  topo{end+1} = n;
-              end
-          end
-
-          % Start the recursion from the input node.
-          recursive_topo(node);
-      end
   end
 
 end
