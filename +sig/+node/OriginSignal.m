@@ -126,28 +126,23 @@ classdef OriginSignal < sig.node.Signal
     end
     function [newNodes, processedIds] = processNode(this, affectedNodes, affectedNodeIds, processedIds)
         % Process current affected nodes and find new ones that can compute
-        % Allow nodes to be re-processed if their inputs change multiple times
         newNodes = {};
-        currentIterationProcessed = [];  % Track what we process in THIS iteration only
         
         for i = 1:length(affectedNodes)
             curr = affectedNodes{i};
             
-            % Skip if already processed in THIS iteration (prevent infinite loops)
-            if any(currentIterationProcessed == curr.Id)
+            % Skip if already processed
+            if any(processedIds == curr.Id)
                 continue;
             end
             
-            % Mark as processed for this iteration
-            currentIterationProcessed(end+1) = curr.Id;
+            % Mark as processed
+            processedIds(end+1) = curr.Id;
             
             % Check targets of this node
             newTargets = this.processTargets(curr, affectedNodeIds);
             newNodes = [newNodes, newTargets];
         end
-        
-        % Update global processed list with current iteration
-        processedIds = [processedIds, currentIterationProcessed];
     end
     
     function newTargets = processTargets(this, currentNode, affectedNodeIds)
