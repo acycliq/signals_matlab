@@ -45,52 +45,50 @@ classdef OriginSignal < sig.node.Signal
     end
 
     function post2(this, value)
-        % Pure MATLAB version replicating MEX transact philosophy (network.c:659-687)
-        % Uses queue-based processing with natural dependency ordering
         
-        % Set working value on origin node (like MEX setNodeWorkingValue)
+        % Set working value on origin node
         this.node.setWorkingValue(value);
         
-        % Initialize queue and affected list (like MEX QUEUE_ALLOC/STACK_ALLOC)
-        queue = {};      % Processing queue (like MEX todo queue)
-        affected = {};   % List of affected nodes (like MEX affected stack)
+        % Initialize queue and affected list
+        queue = {};      % Processing queue
+        affected = {};   % List of affected nodes
         
-        % Queue origin node's targets (like MEX QUEUE_PUT_ALL line 669)
+        % Queue origin node's targets
         for i = 1:length(this.node.Targets)
             target = this.node.Targets{i};
-            if ~target.queued                    % MEX: if (!(vals)[i]->queued)
+            if ~target.queued
                 queue{end+1} = target;
-                target.queued = true;            % MEX: (vals)[i]->queued = true
+                target.queued = true;
             end
         end
-        affected{end+1} = this.node;  % Add origin to affected list (like MEX line 670)
+        affected{end+1} = this.node;  % Add origin to affected list
         
-        % Process queue until empty (like MEX while (!QUEUE_IS_EMPTY(todo)) line 671)
+        % Process queue until empty
         while ~isempty(queue)
-            curr = queue{1};        % Get next node from front (like MEX QUEUE_GET)
+            curr = queue{1};        % Get next node from front
             queue(1) = [];          % Remove from front of queue
-            curr.queued = false;    % MEX: curr->queued = false (line 673)
+            curr.queued = false;
             
-            % Try to compute current node (like MEX transfer(curr) line 676)
+            % Try to compute current node
             if this.allInputsReady(curr)
                 computed = curr.transferMethodHandle();
                 
-                if computed  % If node computed new value (like MEX if (propagate) line 678)
-                    affected{end+1} = curr;  % Add to affected list (like MEX line 680)
+                if computed  % If node computed new value
+                    affected{end+1} = curr;  % Add to affected list
                     
-                    % Queue all targets (like MEX QUEUE_PUT_ALL line 682)
+                    % Queue all targets
                     for j = 1:length(curr.Targets)
                         target = curr.Targets{j};
-                        if ~target.queued                % MEX: if (!(vals)[i]->queued)
+                        if ~target.queued
                             queue{end+1} = target;
-                            target.queued = true;        % MEX: (vals)[i]->queued = true
+                            target.queued = true;
                         end
                     end
                 end
             end
         end
         
-        % Apply all working values (like MEX sqApply)
+        % Apply all working values (MEX: sqApply)
         this.applyWorkingValues(affected);
     end
 

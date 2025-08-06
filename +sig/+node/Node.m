@@ -4,8 +4,6 @@ classdef Node < handle
   
   properties
     FormatSpec
-    % The nodes (and their ordering) which are presented as inputs, e.g.
-    % used in formatting the name of the node, or in a GUI
     DisplayInputs
     Listeners
     transFun
@@ -14,8 +12,8 @@ classdef Node < handle
     Id
     currValue = sig.Nil.instance()
     workingValue = sig.Nil.instance() % Working value for two-phase computation
-    queued = false       % MEX-style queued flag: true if node is currently in processing queue, false otherwise
-                        % Prevents duplicate queuing during signal propagation (matches MEX network.c behavior)
+    queued = false       % mex-style queued flag: true if node is currently in processing queue, false otherwise
+                         % Its role is to prevents duplicate queuing during signal propagation
     Targets % will keep the input nodes (aka children)
   end
   
@@ -138,14 +136,13 @@ classdef Node < handle
     end
     
     function valset = mapn(this)
-      % Transfer function as Node method (MEX-compliant LATEST_VALUE semantics)
-      % MEX Rule: Compute if ANY input has working value, use LATEST_VALUE for all inputs
+      % mex rule: Compute if ANY input has working value, use LATEST_VALUE for all inputs (better also to the line of network.c here, I will forget it!)
       [f, outnum] = this.transArg{:}; % Get from node property
       n = numel(this.Inputs);
       inpvals = cell(n, 1);
       hasWorkingValue = false(n, 1);  % Track which inputs have working values
       
-      % MEX LATEST_VALUE logic: working value if exists, otherwise current value
+      % mex LATEST_VALUE logic: working value if exists, otherwise current value
       for inp = 1:n
         node = this.Inputs(inp);
         if node.workingValue ~= sig.Nil.instance()
@@ -189,12 +186,11 @@ classdef Node < handle
     end
     
     function valset = identity(this)
-      % IDENTITY Transfer function - passes input value to output (MEX-compliant LATEST_VALUE)
-      % MEX Rule: Compute if input has working value, use LATEST_VALUE for the input
+      % identity transfer function - passes input value to output
       if numel(this.Inputs) >= 1
         input = this.Inputs(1);
         
-        % MEX LATEST_VALUE logic: working value if exists, otherwise current value
+        % mex logic: working value if exists, otherwise current value
         if input.workingValue ~= sig.Nil.instance()
           % Input has a working value (new value) - use it and compute
           this.setWorkingValue(input.workingValue);
