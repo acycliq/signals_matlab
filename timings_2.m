@@ -1,7 +1,7 @@
 function timings_2()
     
     clearvars
-    nIters = 1000; 
+    nIters = 100000; 
     name = 'post2 (plain matlab)';
 
     net = sig.Net();
