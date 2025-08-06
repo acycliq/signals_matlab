@@ -67,7 +67,7 @@ classdef Node < handle
       if length(C) >= 3 && strcmp(C{1}, 'sig') && strcmp(C{2}, 'transfer')
         mstr = C{end}; % e.g. 'mapn'
         try
-          % Check if method exists on this object
+          % Check if method exists on this object (maybe I should remove the check if it is costly, need to time it, but shouldnt add too much...)
           if ismethod(this, mstr)
             % Create method handle properly - str2func gets the method, @ binds to object
             methodFunc = str2func(mstr);
