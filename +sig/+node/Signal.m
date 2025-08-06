@@ -529,6 +529,33 @@ classdef Signal < sig.Signal & handle
       end
     end
     
+    function h = onValue2(this, fun)
+      % Pure MATLAB version of onValue - works with post2() 
+      % ONVALUE2 Register a callback for value changes (MEX-free version)
+      %   Returns a handle which when cleared removes this callback.
+      %   Use this with post2() for pure MATLAB signal processing.
+      %
+      %   Input:
+      %     fun (function_handle) : Function to call with new value
+      %
+      % See also onValue, post2
+      callbackidx = this.NextCallbackId + 1;
+      this.NextCallbackId = callbackidx;
+      this.OnValueCallbacks(callbackidx) = fun;
+      if length(this.OnValueCallbacks) == 1 % just added to an empty list
+        % ✅ Use pure MATLAB instead of MEX setNodeEventTarget
+        this.Node.setNodeEventTarget2(this);
+      end
+      h = TidyHandle(@unsub);
+      function unsub()
+        this.OnValueCallbacks.remove(callbackidx);
+        if isempty(this.OnValueCallbacks) % list now empty
+          % ✅ Use pure MATLAB to remove event target
+          this.Node.setNodeEventTarget2([]);
+        end
+      end
+    end
+    
     function h = output(this)
       % OUTPUT Display current value each update
       %   Prints the value of this Signal to the command window each time

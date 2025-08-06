@@ -16,6 +16,7 @@ classdef Node < handle
     workingValue = sig.Nil.instance() % Working value for two-phase computation
     queued = false       % MEX-style queued flag: true if node is currently in processing queue, false otherwise
                         % Prevents duplicate queuing during signal propagation (matches MEX network.c behavior)
+    eventsTarget = []    % Signal object that should be notified on value changes (like MEX eventsTarget)
     Targets % will keep the input nodes (aka children)
   end
   
@@ -128,12 +129,28 @@ classdef Node < handle
         this.workingValue = value;
     end
     
+    function setNodeEventTarget2(this, target)
+        % Pure MATLAB version of MEX setNodeEventTarget
+        % Sets the Signal object that should be notified when this node's value changes
+        this.eventsTarget = target;
+    end
+    
     function commitWorkingValue(this)
         % Copy working value to current value and clear (like MEX)
         if this.workingValue ~= sig.Nil.instance()
             this.setCurrValue(this.workingValue);
             % Clear working value after application (like MEX does)
             this.workingValue = sig.Nil.instance();
+            
+            % ✅ NEW: Trigger event notifications (like MEX lines 377-383)
+            % MEX: if (n[currNode].eventsTarget) { mexCallMATLAB(..., "valueChanged"); }
+            if ~isempty(this.eventsTarget) && isvalid(this.eventsTarget)
+                try
+                    this.eventsTarget.valueChanged(this.currValue);
+                catch ex
+                    warning('Event notification failed for node %s: %s', this.Name, ex.message);
+                end
+            end
         end
     end
     
