@@ -543,14 +543,14 @@ classdef Signal < sig.Signal & handle
       this.NextCallbackId = callbackidx;
       this.OnValueCallbacks(callbackidx) = fun;
       if length(this.OnValueCallbacks) == 1 % just added to an empty list
-        % ✅ Use pure MATLAB instead of MEX setNodeEventTarget
+        % Use pure MATLAB instead of MEX setNodeEventTarget
         this.Node.setNodeEventTarget2(this);
       end
       h = TidyHandle(@unsub);
       function unsub()
         this.OnValueCallbacks.remove(callbackidx);
         if isempty(this.OnValueCallbacks) % list now empty
-          % ✅ Use pure MATLAB to remove event target
+          % Use pure MATLAB to remove event target
           this.Node.setNodeEventTarget2([]);
         end
       end
