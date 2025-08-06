@@ -138,24 +138,24 @@ classdef Node < handle
     end
     
     function valset = mapn(this)
-      % Transfer function as Node method (two-phase working values)
-      % Apply values of inputs through mapn function
+      % Transfer function as Node method (MEX-compliant LATEST_VALUE semantics)
+      % MEX Rule: Compute if ANY input has working value, use LATEST_VALUE for all inputs
       [f, outnum] = this.transArg{:}; % Get from node property
       n = numel(this.Inputs);
       inpvals = cell(n, 1);
       hasWorkingValue = false(n, 1);  % Track which inputs have working values
       
-      % Check each input: working value first, then current value
+      % MEX LATEST_VALUE logic: working value if exists, otherwise current value
       for inp = 1:n
         node = this.Inputs(inp);
         if node.workingValue ~= sig.Nil.instance()
-          % Input has a working value (new value)
+          % Input has a working value (new value) - use it
           inpvals{inp} = node.workingValue;
           hasWorkingValue(inp) = true;
         elseif node.currValue ~= sig.Nil.instance()
-          % Fall back to current value (old value)
+          % Fall back to current value (MEX LATEST_VALUE behavior)
           inpvals{inp} = node.currValue;
-          hasWorkingValue(inp) = false;
+          hasWorkingValue(inp) = false;  % Constants don't trigger, but provide values
         else
           % No value at all - can't compute
           valset = false;
@@ -163,13 +163,13 @@ classdef Node < handle
         end
       end
       
-      % Only proceed if at least one input has a working value (new value)
+      % MEX Rule: Only compute if at least one input has a working value (changed)
       if ~any(hasWorkingValue)
         valset = false;
         return;
       end
       
-      % All inputs have values and at least one is new - apply the function
+      % At least one input changed - apply the function using LATEST_VALUE for all
       try
         out = cell(1, outnum);
         [out{:}] = f(inpvals{:});
@@ -189,21 +189,21 @@ classdef Node < handle
     end
     
     function valset = identity(this)
-      % IDENTITY Transfer function - passes input value to output (two-phase)
+      % IDENTITY Transfer function - passes input value to output (MEX-compliant LATEST_VALUE)
+      % MEX Rule: Compute if input has working value, use LATEST_VALUE for the input
       if numel(this.Inputs) >= 1
         input = this.Inputs(1);
         
-        % Check working value first, then current value
+        % MEX LATEST_VALUE logic: working value if exists, otherwise current value
         if input.workingValue ~= sig.Nil.instance()
-          % Input has a working value (new value) - use it
+          % Input has a working value (new value) - use it and compute
           this.setWorkingValue(input.workingValue);
           valset = true;
         elseif input.currValue ~= sig.Nil.instance()
-          % Fall back to current value, but only if no working value exists
-          % This means the input hasn't changed, so we shouldn't compute
+          % Input has current value but no working value - don't compute (no change)
           valset = false;
         else
-          % No value at all
+          % No value at all - can't compute
           valset = false;
         end
       else
