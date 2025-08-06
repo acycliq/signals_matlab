@@ -142,7 +142,7 @@ classdef Node < handle
             % Clear working value after application (like MEX does)
             this.workingValue = sig.Nil.instance();
             
-            % NEW: Trigger event notifications (like MEX lines 377-383)
+            % ✅ NEW: Trigger event notifications (like MEX lines 377-383)
             % MEX: if (n[currNode].eventsTarget) { mexCallMATLAB(..., "valueChanged"); }
             if ~isempty(this.eventsTarget) && isvalid(this.eventsTarget)
                 try
