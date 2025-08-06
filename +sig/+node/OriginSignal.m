@@ -127,15 +127,25 @@ classdef OriginSignal < sig.node.Signal
     end
     
     function ready = allInputsReady(this, node)
-        % CHECK IF ALL INPUTS OF A NODE HAVE CURRENT VALUES
-        % Used to determine if a node can compute its transfer function
+        % CHECK IF ALL INPUTS HAVE VALUES (MEX LATEST_VALUE logic)
+        % MEX Rule: workingValue takes precedence, fallback to currValue only for readiness check
+        % This implements MEX LATEST_VALUE, see line 689 of network.c: workingValue ? workingValue : currValue
 
         ready = true;  % Assume ready until proven otherwise
         
-        % Check each input node individually
+        % Check each input node individually - MEX LATEST_VALUE logic
         for i = 1:length(node.Inputs)
-            if node.Inputs(i).currValue == sig.Nil.instance()
-                ready = false;  % Found unready input
+            input = node.Inputs(i);
+            % MEX LATEST_VALUE: check working value first, then current value
+            if input.workingValue ~= sig.Nil.instance()
+                % Input has working value - it's ready
+                continue;
+            elseif input.currValue ~= sig.Nil.instance()
+                % Input has current value but no working value - it's ready
+                continue;
+            else
+                % Input has no value at all - not ready
+                ready = false;
                 return;
             end
         end
