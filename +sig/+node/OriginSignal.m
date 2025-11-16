@@ -45,68 +45,49 @@ classdef OriginSignal < sig.node.Signal
     end
 
     function post2(this, value)
-
+        
         % Set working value on origin node
         this.node.setWorkingValue(value);
-
-        % Pre-allocate circular buffer queue (should be 1:1 to the MEX circular buffer logic)
-        maxNodes = length(this.node.Net.nodes);
-        queue = cell(1, maxNodes);
-        qHead = 1;   % Read position
-        qTail = 1;   % Write position
-        qSize = 0;   % Current queue size
-
+        
+        % Initialize queue and affected list
+        queue = {};      % Processing queue
         affected = {};   % List of affected nodes
-
+        
         % Queue origin node's targets
         for i = 1:length(this.node.Targets)
             target = this.node.Targets{i};
             if ~target.queued
-                queue{qTail} = target;
-                qTail = qTail + 1;
-                if qTail > maxNodes
-                    qTail = 1;
-                end
-                qSize = qSize + 1;
+                queue{end+1} = target;
                 target.queued = true;
             end
         end
         affected{end+1} = this.node;  % Add origin to affected list
-
+        
         % Process queue until empty
-        while qSize > 0
-            curr = queue{qHead};     % Get next node from front
-            qHead = qHead + 1;       % Advance head
-            if qHead > maxNodes
-                qHead = 1;
-            end
-            qSize = qSize - 1;
+        while ~isempty(queue)
+            curr = queue{1};        % Get next node from front
+            queue(1) = [];          % Remove from front of queue
             curr.queued = false;
-
+            
             % Try to compute current node
             if this.allInputsReady(curr)
                 computed = curr.transferMethodHandle();
-
+                
                 if computed  % If node computed new value
                     affected{end+1} = curr;  % Add to affected list
-
+                    
                     % Queue all targets
                     for j = 1:length(curr.Targets)
                         target = curr.Targets{j};
                         if ~target.queued
-                            queue{qTail} = target;
-                            qTail = qTail + 1;
-                            if qTail > maxNodes
-                                qTail = 1;
-                            end
-                            qSize = qSize + 1;
+                            queue{end+1} = target;
                             target.queued = true;
                         end
                     end
                 end
             end
         end
-
+        
         % Apply all working values (MEX: sqApply)
         this.applyWorkingValues(affected);
     end
