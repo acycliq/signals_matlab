@@ -133,10 +133,11 @@ classdef Node < handle
     
     function commitWorkingValue(this)
         % Copy working value to current value and clear (like MEX)
-        if this.workingValue ~= sig.Nil.instance()
+        nilInstance = sig.Nil.instance();  % save it so I don't call the function twice
+        if this.workingValue ~= nilInstance
             this.setCurrValue(this.workingValue);
             % Clear working value after application (like MEX does)
-            this.workingValue = sig.Nil.instance();
+            this.workingValue = nilInstance;
         end
     end
     
@@ -197,13 +198,16 @@ classdef Node < handle
       % identity transfer function - passes input value to output
       if numel(this.Inputs) >= 1
         input = this.Inputs(1);
-        
+
+        % save Nil so I don't keep calling instance()
+        nilInstance = sig.Nil.instance();
+
         % mex logic: working value if exists, otherwise current value
-        if input.workingValue ~= sig.Nil.instance()
+        if input.workingValue ~= nilInstance
           % Input has a working value (new value) - use it and compute
           this.setWorkingValue(input.workingValue);
           valset = true;
-        elseif input.currValue ~= sig.Nil.instance()
+        elseif input.currValue ~= nilInstance
           % Input has current value but no working value - don't compute (no change)
           valset = false;
         else

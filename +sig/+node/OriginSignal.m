@@ -54,7 +54,7 @@ classdef OriginSignal < sig.node.Signal
         affected = {};   % List of affected nodes
 
         % Queue origin node's targets
-        nTargets = length(this.node.Targets);  % cache length to avoid repeated calls
+        nTargets = length(this.node.Targets);  % save length so I don't call it multiple times
         for i = 1:nTargets
             target = this.node.Targets{i};
             if ~target.queued
@@ -64,10 +64,11 @@ classdef OriginSignal < sig.node.Signal
         end
         affected{end+1} = this.node;  % Add origin to affected list
 
-        % Process queue until empty
-        while ~isempty(queue)
-            curr = queue{1};        % Get next node from front
-            queue(1) = [];          % Remove from front of queue
+        % Use index instead of removing from queue (queue(1)=[] is slow)
+        qIdx = 1;
+        while qIdx <= length(queue)
+            curr = queue{qIdx};
+            qIdx = qIdx + 1;
             curr.queued = false;
 
             % Just call the transfer function, it checks if inputs are ready
@@ -77,7 +78,7 @@ classdef OriginSignal < sig.node.Signal
                 affected{end+1} = curr;  % Add to affected list
 
                 % Queue all targets
-                nTargets = length(curr.Targets);  % cache to avoid calling length() every time
+                nTargets = length(curr.Targets);  % save it so i don't keep calling length (used this trick elsewhere)
                 for j = 1:nTargets
                     target = curr.Targets{j};
                     if ~target.queued
