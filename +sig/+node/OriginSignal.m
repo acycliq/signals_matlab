@@ -45,16 +45,17 @@ classdef OriginSignal < sig.node.Signal
     end
 
     function post2(this, value)
-        
+
         % Set working value on origin node
         this.node.setWorkingValue(value);
-        
+
         % Initialize queue and affected list
         queue = {};      % Processing queue
         affected = {};   % List of affected nodes
-        
+
         % Queue origin node's targets
-        for i = 1:length(this.node.Targets)
+        nTargets = length(this.node.Targets);  % cache length to avoid repeated calls
+        for i = 1:nTargets
             target = this.node.Targets{i};
             if ~target.queued
                 queue{end+1} = target;
@@ -62,32 +63,31 @@ classdef OriginSignal < sig.node.Signal
             end
         end
         affected{end+1} = this.node;  % Add origin to affected list
-        
+
         % Process queue until empty
         while ~isempty(queue)
             curr = queue{1};        % Get next node from front
             queue(1) = [];          % Remove from front of queue
             curr.queued = false;
-            
-            % Try to compute current node
-            if this.allInputsReady(curr)
-                computed = curr.transferMethodHandle();
-                
-                if computed  % If node computed new value
-                    affected{end+1} = curr;  % Add to affected list
-                    
-                    % Queue all targets
-                    for j = 1:length(curr.Targets)
-                        target = curr.Targets{j};
-                        if ~target.queued
-                            queue{end+1} = target;
-                            target.queued = true;
-                        end
+
+            % Just call the transfer function, it checks if inputs are ready
+            computed = curr.transferMethodHandle();
+
+            if computed  % If node computed new value
+                affected{end+1} = curr;  % Add to affected list
+
+                % Queue all targets
+                nTargets = length(curr.Targets);  % cache to avoid calling length() every time
+                for j = 1:nTargets
+                    target = curr.Targets{j};
+                    if ~target.queued
+                        queue{end+1} = target;
+                        target.queued = true;
                     end
                 end
             end
         end
-        
+
         % Apply all working values (MEX: sqApply)
         this.applyWorkingValues(affected);
     end

@@ -146,15 +146,18 @@ classdef Node < handle
       n = numel(this.Inputs);
       inpvals = cell(n, 1);
       hasWorkingValue = false(n, 1);  % Track which inputs have working values
-      
+
+      % grab the Nil instance once instead of calling it over and over
+      nilInstance = sig.Nil.instance();
+
       % mex LATEST_VALUE logic: working value if exists, otherwise current value
       for inp = 1:n
         node = this.Inputs(inp);
-        if node.workingValue ~= sig.Nil.instance()
+        if node.workingValue ~= nilInstance
           % Input has a working value (new value) - use it
           inpvals{inp} = node.workingValue;
           hasWorkingValue(inp) = true;
-        elseif node.currValue ~= sig.Nil.instance()
+        elseif node.currValue ~= nilInstance
           % Fall back to current value (MEX LATEST_VALUE behavior)
           inpvals{inp} = node.currValue;
           hasWorkingValue(inp) = false;  % Constants don't trigger, but provide values
@@ -164,13 +167,13 @@ classdef Node < handle
           return;
         end
       end
-      
+
       % MEX Rule: Only compute if at least one input has a working value (changed)
       if ~any(hasWorkingValue)
         valset = false;
         return;
       end
-      
+
       % At least one input changed - apply the function using LATEST_VALUE for all
       try
         out = cell(1, outnum);
