@@ -83,6 +83,11 @@ classdef Node < handle
       end
       this.Targets = {};
       this.Net.addNode(this);
+
+      % Register this node as a target of all its inputs (mimics MEX addTargetToInputs)
+      for i = 1:numel(this.Inputs)
+        this.Inputs(i).Targets{end+1} = this;
+      end
     end
     
     function v = get.Name(this)
