@@ -72,7 +72,8 @@ classdef OriginSignal < sig.node.Signal
             curr.queued = false;
 
             % Just call the transfer function, it checks if inputs are ready
-            computed = curr.transferMethodHandle();
+            % Using dynamic dispatch: curr.(methodName)()
+            computed = curr.(curr.transferMethodName)();
 
             if computed  % If node computed new value
                 affected{end+1} = curr;  % Add to affected list
