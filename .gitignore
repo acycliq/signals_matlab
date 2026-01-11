@@ -187,3 +187,6 @@ pip-log.txt
 
 #Mr Developer
 .mr.developer.cfg
+
+# Notes folder
+notes/
