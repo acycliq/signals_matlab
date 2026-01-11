@@ -8,7 +8,7 @@ classdef Node < handle
     Listeners
     transFun
     transArg
-    transferMethodName  % Method name string (dynamic dispatch approach)
+    transferMethodHandle  % Method handle
     Id
     currValue = sig.Nil.instance()
     workingValue = sig.Nil.instance() % Working value for two-phase computation
@@ -69,8 +69,9 @@ classdef Node < handle
         try
           % Check if method exists on this object (maybe I should remove the check if it is costly, need to time it, but shouldnt add too much...)
           if ismethod(this, mstr)
-            % Store method name for dynamic dispatch
-            this.transferMethodName = mstr;
+            % Create method handle properly - str2func gets the method, @ binds to object
+            methodFunc = str2func(mstr);
+            this.transferMethodHandle = @() methodFunc(this);
           else
             error('Transfer function method %s not found on Node class', mstr);
           end
