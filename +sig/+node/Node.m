@@ -140,10 +140,7 @@ classdef Node < handle
             this.workingValue = nilInstance;
         end
     end
-  end
-
-  methods (Sealed)
-    % Transfer functions - Sealed for faster method dispatch
+    
     function valset = mapn(this)
       % mex rule: Compute if ANY input has working value, use LATEST_VALUE for all inputs (better also to the line of network.c here, I will forget it!)
       [f, outnum] = this.transArg{:}; % Get from node property
