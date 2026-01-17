@@ -220,6 +220,61 @@ classdef Signals_post2_test < matlab.unittest.TestCase
         'merge should return false when no input has working value');
     end
 
+    %% filter Tests
+    function test_filter_passes_matching(testCase)
+      % Test filter passes values when f(value) == criterion
+      [a, b] = deal(testCase.A, testCase.B);
+      f = a.filter(@ischar, b);
+
+      b.post2(true);  % criterion = true, so pass when ischar(value) == true
+      a.post2('hello');
+      testCase.verifyEqual(f.Node.currValue, 'hello', ...
+        'filter should pass char when criterion is true');
+    end
+
+    function test_filter_blocks_nonmatching(testCase)
+      % Test filter blocks values when f(value) ~= criterion
+      [a, b] = deal(testCase.A, testCase.B);
+      f = a.filter(@ischar, b);
+
+      b.post2(true);  % criterion = true
+      a.post2('hello');
+      testCase.verifyEqual(f.Node.currValue, 'hello');
+
+      a.post2(123);  % ischar(123) == false, doesn't match criterion
+      testCase.verifyEqual(f.Node.currValue, 'hello', ...
+        'filter should block non-char when criterion is true');
+    end
+
+    function test_filter_criterion_change(testCase)
+      % Test filter responds to criterion changes
+      [a, b] = deal(testCase.A, testCase.B);
+      f = a.filter(@ischar, b);
+
+      b.post2(true);
+      a.post2('text');
+      testCase.verifyEqual(f.Node.currValue, 'text');
+
+      b.post2(false);  % now pass when ischar(value) == false
+      a.post2(42);
+      testCase.verifyEqual(f.Node.currValue, 42, ...
+        'filter should pass number when criterion is false');
+    end
+
+    function test_filter_no_working_value(testCase)
+      % Test filter returns false when "what" has no working value
+      [a, b] = deal(testCase.A, testCase.B);
+      f = a.filter(@ischar, b);
+
+      b.post2(true);
+      a.post2('test');
+      testCase.verifyEqual(f.Node.currValue, 'test');
+
+      result = f.Node.filter();
+      testCase.verifyFalse(result, ...
+        'filter should return false when input has no working value');
+    end
+
     %% identity Tests
     function test_identity_basic(testCase)
       % Test identity transfer function
