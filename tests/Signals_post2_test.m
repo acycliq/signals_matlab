@@ -176,6 +176,50 @@ classdef Signals_post2_test < matlab.unittest.TestCase
         'map should return false when input has no working value');
     end
 
+    %% merge Tests
+    function test_merge_basic(testCase)
+      % Test merge returns value of most recently updated input
+      [a, b, c] = deal(testCase.A, testCase.B, testCase.C);
+      m = merge(a, b, c);
+
+      a.post2(10);
+      testCase.verifyEqual(m.Node.currValue, 10);
+
+      b.post2(20);
+      testCase.verifyEqual(m.Node.currValue, 20);
+
+      c.post2(30);
+      testCase.verifyEqual(m.Node.currValue, 30);
+    end
+
+    function test_merge_multiple_updates(testCase)
+      % Test merge with multiple updates to different inputs
+      [a, b, c] = deal(testCase.A, testCase.B, testCase.C);
+      m = merge(a, b, c);
+
+      % Update in different order
+      for s = {c, b, a, b}
+        v = randi(100);
+        s{1}.post2(v);
+        testCase.verifyEqual(m.Node.currValue, v, ...
+          'merge should output most recently updated input');
+      end
+    end
+
+    function test_merge_no_working_value(testCase)
+      % Test merge returns false when no inputs have working value
+      [a, b] = deal(testCase.A, testCase.B);
+      m = merge(a, b);
+
+      a.post2(5);
+      testCase.verifyEqual(m.Node.currValue, 5);
+
+      % After commit, calling merge directly should return false
+      result = m.Node.merge();
+      testCase.verifyFalse(result, ...
+        'merge should return false when no input has working value');
+    end
+
     %% identity Tests
     function test_identity_basic(testCase)
       % Test identity transfer function
