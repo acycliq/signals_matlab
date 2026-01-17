@@ -218,6 +218,28 @@ classdef Node < handle
         valset = false;
       end
     end
+
+    function valset = map(this)
+      % map transfer function - applies function to single input
+      % See +sig/+transfer/map.m for MEX reference
+      f = this.transArg;
+      input = this.Inputs(1);
+      nilInstance = sig.Nil.instance();
+
+      % Only compute if input has a working value (new value)
+      if input.workingValue ~= nilInstance
+        try
+          val = f(input.workingValue);
+          this.setWorkingValue(val);
+          valset = true;
+        catch ex
+          warning('Error in map for node %s: %s', this.Name, ex.message);
+          valset = false;
+        end
+      else
+        valset = false;
+      end
+    end
     
 
   end
