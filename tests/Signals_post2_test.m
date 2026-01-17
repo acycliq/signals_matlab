@@ -125,6 +125,57 @@ classdef Signals_post2_test < matlab.unittest.TestCase
         'Working value should be cleared after commit');
     end
 
+    %% map Tests
+    function test_map_function(testCase)
+      % Test mapping signal through a function
+      a = testCase.A;
+      b = a.map(@fliplr);
+
+      arr = 1:5;
+      a.post2(arr);
+
+      testCase.verifyEqual(b.Node.currValue, fliplr(arr), ...
+        'map should apply function to input');
+    end
+
+    function test_map_constant(testCase)
+      % Test mapping to a constant value
+      a = testCase.A;
+      v = 42;
+      b = a.map(v);
+
+      a.post2(1:3);
+
+      testCase.verifyEqual(b.Node.currValue, v, ...
+        'map should return constant regardless of input');
+    end
+
+    function test_map_multiple_updates(testCase)
+      % Test map propagates multiple updates
+      a = testCase.A;
+      b = a.map(@(x) x * 2);
+
+      a.post2(5);
+      testCase.verifyEqual(b.Node.currValue, 10);
+
+      a.post2(7);
+      testCase.verifyEqual(b.Node.currValue, 14);
+    end
+
+    function test_map_no_working_value(testCase)
+      % Test map returns false when input has no working value
+      a = testCase.A;
+      b = a.map(@(x) x + 1);
+
+      a.post2(5);
+      testCase.verifyEqual(b.Node.currValue, 6);
+
+      % After commit, calling map directly should return false
+      result = b.Node.map();
+      testCase.verifyFalse(result, ...
+        'map should return false when input has no working value');
+    end
+
     %% identity Tests
     function test_identity_basic(testCase)
       % Test identity transfer function
