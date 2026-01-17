@@ -240,6 +240,35 @@ classdef Node < handle
         valset = false;
       end
     end
+
+    function valset = merge(this)
+      % merge transfer function - returns value of first input with working value
+      % See +sig/+transfer/merge.m for MEX reference
+      % Combines multiple signals into one. Whenever any input updates,
+      % the output takes that value.
+      %
+      % Loops through inputs looking for one with a workingValue (i.e. one
+      % that was just updated this cycle). If inputs are independent origins,
+      % only one updates at a time:
+      %   m = merge(a, b, c);
+      %   a.post2(10);  % a has workingValue, b and c don't -> m gets 10
+      %
+      % But if inputs share a node, multiple could update:
+      %   a = x * 2; b = x + 1; m = merge(a, b);
+      %   x.post2(5);  % both a and b have workingValues -> m gets a (first one)
+      nilInstance = sig.Nil.instance();
+
+      for i = 1:numel(this.Inputs)
+        if this.Inputs(i).workingValue ~= nilInstance
+          this.setWorkingValue(this.Inputs(i).workingValue);
+          valset = true;
+          return
+        end
+      end
+
+      % No inputs have working values
+      valset = false;
+    end
     
 
   end
