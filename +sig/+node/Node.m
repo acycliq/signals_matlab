@@ -269,6 +269,46 @@ classdef Node < handle
       % No inputs have working values
       valset = false;
     end
+
+    function valset = filter(this)
+      % filter transfer function - only passes value if f(value) == condition
+      % See +sig/+transfer/filter.m for MEX reference
+      %
+      % User calls: y = x.filter(@f, condition) where x is a signal
+      % If the underlying node of x has workingValue **and** f(workingValue) == condition,
+      % pass through workingValue.
+      % Example: b = a.filter(@ischar, true) passes value only if it's a char.
+      f = this.transArg;
+      nilInstance = sig.Nil.instance();
+
+      % Get condition using LATEST_VALUE logic
+      nCondition = this.Inputs(2);
+      if nCondition.workingValue ~= nilInstance
+        condition = nCondition.workingValue;
+      elseif nCondition.currValue ~= nilInstance
+        condition = nCondition.currValue;
+      else
+        valset = false;
+        return
+      end
+
+      % Only proceed if node n has a working value
+      n = this.Inputs(1);
+      if n.workingValue ~= nilInstance
+        try
+          indicator = f(n.workingValue);
+          if indicator == condition
+            this.setWorkingValue(n.workingValue);
+            valset = true;
+            return
+          end
+        catch ex
+          warning('Error in filter for node %s: %s', this.Name, ex.message);
+        end
+      end
+
+      valset = false;
+    end
     
 
   end
