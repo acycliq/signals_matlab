@@ -266,7 +266,7 @@ classdef Node < handle
         end
       end
 
-      % No inputs have working values
+      % If no inputs have working values then set valset to false
       valset = false;
     end
 
@@ -307,12 +307,46 @@ classdef Node < handle
         end
       end
 
+      % Otherwise set to false
       valset = false;
     end
-    
+
+    function valset = at(this)
+      % at transfer function - samples 'what' when 'when' becomes truthy
+      % See +sig/+transfer/at.m for MEX reference
+      %
+      % this.Inputs(1) is 'what' - the value to sample
+      % this.Inputs(2) is 'when' - the trigger
+      % Example: clickedPos = pos.at(click) - grab pos value when click fires
+      nilInstance = sig.Nil.instance();
+
+      % In MEX: [when, whenset] = workingNodeValue(net, inputs(2))
+      % Here we just access the node's workingValue directly
+      nWhen = this.Inputs(2);
+      whenWorking = nWhen.workingValue;
+
+      % whenset in MEX tells us if working value exists, we check ~= Nil instead
+      if whenWorking ~= nilInstance && whenWorking  % whenset && when is truthy
+        % Now get 'what' value - try working first, fall back to current
+        % MEX does: [what, whatset] = workingNodeValue(...) then currNodeValue(...)
+        nWhat = this.Inputs(1);
+        if nWhat.workingValue ~= nilInstance
+          this.setWorkingValue(nWhat.workingValue);
+          valset = true;
+          return
+        elseif nWhat.currValue ~= nilInstance
+          this.setWorkingValue(nWhat.currValue);
+          valset = true;
+          return
+        end
+      end
+
+      valset = false;
+    end
+
 
   end
-  
+
   methods (Access = protected)
     function netDeleted(this, ~, ~)
       if isvalid(this)
