@@ -275,6 +275,75 @@ classdef Signals_post2_test < matlab.unittest.TestCase
         'filter should return false when input has no working value');
     end
 
+    %% at Tests
+    function test_at_basic(testCase)
+      % Test basic at: sample 'what' when 'when' fires
+      [pos, click] = deal(testCase.A, testCase.B);
+      clickedPos = pos.at(click);
+
+      pos.post2(100);
+      testCase.verifyTrue(clickedPos.Node.currValue == sig.Nil.instance(), ...
+        'at should not fire until when is truthy');
+
+      click.post2(true);
+      testCase.verifyEqual(clickedPos.Node.currValue, 100, ...
+        'at should sample pos when click fires');
+    end
+
+    function test_at_samples_current_value(testCase)
+      % Test at grabs the current 'what' value even if 'what' didnt just update
+      [pos, click] = deal(testCase.A, testCase.B);
+      clickedPos = pos.at(click);
+
+      pos.post2(50);
+      pos.post2(75);  % pos is now 75
+      click.post2(true);
+      testCase.verifyEqual(clickedPos.Node.currValue, 75, ...
+        'at should grab current pos value');
+    end
+
+    function test_at_ignores_falsy_when(testCase)
+      % Test at does nothing when 'when' is falsy
+      [pos, click] = deal(testCase.A, testCase.B);
+      clickedPos = pos.at(click);
+
+      pos.post2(100);
+      click.post2(false);  % falsy - should not trigger
+      testCase.verifyTrue(clickedPos.Node.currValue == sig.Nil.instance(), ...
+        'at should not fire when when is false');
+
+      click.post2(0);  % also falsy
+      testCase.verifyTrue(clickedPos.Node.currValue == sig.Nil.instance(), ...
+        'at should not fire when when is 0');
+    end
+
+    function test_at_multiple_samples(testCase)
+      % Test at can sample multiple times
+      [pos, click] = deal(testCase.A, testCase.B);
+      clickedPos = pos.at(click);
+
+      pos.post2(10);
+      click.post2(true);
+      testCase.verifyEqual(clickedPos.Node.currValue, 10);
+
+      pos.post2(20);
+      pos.post2(30);
+      click.post2(true);
+      testCase.verifyEqual(clickedPos.Node.currValue, 30, ...
+        'at should sample latest pos on second click');
+    end
+
+    function test_at_no_what_value(testCase)
+      % Test at does nothing if 'what' has no value at all
+      [pos, click] = deal(testCase.A, testCase.B);
+      clickedPos = pos.at(click);
+
+      % click fires but pos was never set
+      click.post2(true);
+      testCase.verifyTrue(clickedPos.Node.currValue == sig.Nil.instance(), ...
+        'at should not fire if what has no value');
+    end
+
     %% identity Tests
     function test_identity_basic(testCase)
       % Test identity transfer function
