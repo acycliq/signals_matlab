@@ -352,6 +352,65 @@ classdef Node < handle
       valset = false;
     end
 
+    function valset = buffer(this)
+      % buffer transfer function - accumulates values into a rolling array
+      % See +sig/+transfer/buffer.m for MEX reference
+      %
+      % this.Inputs(1) is the new sample to append
+      % this.Inputs(2) is the max buffer size
+      nilInstance = sig.Nil.instance();
+
+      % MEX L26-32: Get max buffer size using LATEST_VALUE logic
+      nMaxSamps = this.Inputs(2);
+      if nMaxSamps.workingValue ~= nilInstance
+        maxSamps = nMaxSamps.workingValue;
+        % No zero check here — matches MEX (zero check only in currValue branch)
+      elseif nMaxSamps.currValue ~= nilInstance
+        maxSamps = nMaxSamps.currValue;
+        if ~maxSamps  % zero check matches MEX L29
+          valset = false;
+          return
+        end
+      else
+        valset = false;
+        return
+      end
+
+      % MEX L35: Get current buffer contents from this node's own currValue
+      % In MEX, currNodeValue returns [] when no value set yet.
+      % Here currValue is Nil initially, so convert to [] for first call.
+      if this.currValue ~= nilInstance
+        buff = this.currValue;
+      else
+        buff = [];
+      end
+
+      % MEX L37-38: Only proceed if new sample has a working value
+      newval = this.Inputs(1).workingValue;
+      if newval ~= nilInstance
+        try
+          % MEX L40-46: Concatenation logic
+          free = size(buff, 2) - maxSamps;
+          if free >= 0  % buffer full, drop oldest and append new
+            val = cat(2, buff(:, free+2:end), newval);
+          else  % buffer not full, just append
+            val = [buff newval];
+          end
+          this.setWorkingValue(val);
+          valset = true;
+        catch ex
+          msg = sprintf('Error in buffer for node %s:\nConcatenating %s to buffer produced an error:\n %s', ...
+            this.Name, toStr(newval, 1), ex.message);
+          sigEx = sig.Exception('transfer:buffer:error', ...
+            msg, this.Net.Id, this.Id, [this.Inputs.Id], {buff, newval}, @horzcat);
+          ex = ex.addCause(sigEx);
+          rethrow(ex)
+        end
+      else
+        valset = false;
+      end
+    end
+
 
   end
 
