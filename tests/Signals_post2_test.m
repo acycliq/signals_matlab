@@ -344,6 +344,17 @@ classdef Signals_post2_test < matlab.unittest.TestCase
         'at should not fire if what has no value');
     end
 
+    function test_at_nonscalar_when_errors(testCase)
+      % Test at throws error when 'when' is a non-scalar array
+      % The 'when' trigger must be scalar - arrays don't make sense here
+      [pos, click] = deal(testCase.A, testCase.B);
+      clickedPos = pos.at(click);
+
+      pos.post2(42);
+      testCase.verifyError(@() click.post2([1 1 1]), ...
+        'signals:at:nonScalarWhen');
+    end
+
     %% identity Tests
     function test_identity_basic(testCase)
       % Test identity transfer function
