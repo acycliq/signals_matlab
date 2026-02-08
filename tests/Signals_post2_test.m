@@ -593,5 +593,71 @@ classdef Signals_post2_test < matlab.unittest.TestCase
           sprintf('bufferUpTo failed at step %d', i));
       end
     end
+
+    %% skipRepeats Tests
+    function test_skipRepeats_blocks_duplicates(testCase)
+      % Test skipRepeats blocks repeated values
+      a = testCase.A;
+      nr = a.skipRepeats();
+
+      a.post2(5);
+      testCase.verifyEqual(nr.Node.currValue, 5);
+
+      a.post2(5);  % same value — should be blocked
+      testCase.verifyEqual(nr.Node.currValue, 5, ...
+        'skipRepeats should still be 5, not re-propagated');
+    end
+
+    function test_skipRepeats_passes_different(testCase)
+      % Test skipRepeats passes through when value changes
+      a = testCase.A;
+      nr = a.skipRepeats();
+
+      a.post2(5);
+      testCase.verifyEqual(nr.Node.currValue, 5);
+
+      a.post2(10);
+      testCase.verifyEqual(nr.Node.currValue, 10, ...
+        'skipRepeats should pass through different value');
+    end
+
+    function test_skipRepeats_first_value_always_passes(testCase)
+      % Test first value always passes (no current value to compare)
+      a = testCase.A;
+      nr = a.skipRepeats();
+
+      a.post2(42);
+      testCase.verifyEqual(nr.Node.currValue, 42, ...
+        'First value should always pass through');
+    end
+
+    function test_skipRepeats_with_arrays(testCase)
+      % Test skipRepeats works with arrays (uses isequal)
+      a = testCase.A;
+      nr = a.skipRepeats();
+
+      a.post2([1 2 3]);
+      testCase.verifyEqual(nr.Node.currValue, [1 2 3]);
+
+      a.post2([1 2 3]);  % same array — blocked
+      testCase.verifyEqual(nr.Node.currValue, [1 2 3]);
+
+      a.post2([1 2 4]);  % different array — passes
+      testCase.verifyEqual(nr.Node.currValue, [1 2 4]);
+    end
+
+    function test_skipRepeats_no_working_value(testCase)
+      % Test skipRepeats returns false when input has no working value
+      a = testCase.A;
+      nr = a.skipRepeats();
+
+      a.post2(5);
+      testCase.verifyEqual(nr.Node.currValue, 5);
+
+      % After commit, calling skipRepeats directly should return false
+      result = nr.Node.skipRepeats();
+      testCase.verifyFalse(result, ...
+        'skipRepeats should return false when input has no working value');
+    end
   end
 end
