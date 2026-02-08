@@ -411,6 +411,30 @@ classdef Node < handle
       end
     end
 
+    function valset = skipRepeats(this)
+      % skipRepeats transfer function - only passes value if different from current
+      % See +sig/+transfer/skipRepeats.m for MEX reference
+      %
+      % Assumes one input. Compares input's working value against this
+      % node's own currValue using isequal. First value always passes.
+      nilInstance = sig.Nil.instance();
+
+      % MEX L8-9: Get new value from input's working value
+      wv = this.Inputs(1).workingValue;
+      if wv ~= nilInstance
+        % MEX L10-11: Compare against this node's own currValue
+        % ~cvset (Nil) means no current value yet — always pass through
+        % ~isequal means value changed — pass through
+        if this.currValue == nilInstance || ~isequal(wv, this.currValue)
+          this.setWorkingValue(wv);
+          valset = true;
+          return
+        end
+      end
+
+      valset = false;
+    end
+
 
   end
 
