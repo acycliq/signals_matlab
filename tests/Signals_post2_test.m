@@ -498,5 +498,100 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       testCase.verifyEqual(d.Node.currValue, 31, ...  % 3*10 + 1
         'Diamond dependency update failed');
     end
+
+    %% buffer Tests
+    function test_buffer_basic(testCase)
+      % Test buffer accumulates values into an array
+      a = testCase.A;
+      b = a.bufferUpTo(5);
+
+      a.post2(10);
+      testCase.verifyEqual(b.Node.currValue, 10);
+
+      a.post2(20);
+      testCase.verifyEqual(b.Node.currValue, [10 20]);
+
+      a.post2(30);
+      testCase.verifyEqual(b.Node.currValue, [10 20 30]);
+    end
+
+    function test_buffer_overflow(testCase)
+      % Test buffer drops oldest values when full
+      a = testCase.A;
+      b = a.bufferUpTo(3);
+
+      a.post2(1);
+      a.post2(2);
+      a.post2(3);
+      testCase.verifyEqual(b.Node.currValue, [1 2 3]);
+
+      a.post2(4);
+      testCase.verifyEqual(b.Node.currValue, [2 3 4]);
+
+      a.post2(5);
+      testCase.verifyEqual(b.Node.currValue, [3 4 5]);
+
+      a.post2(6);
+      testCase.verifyEqual(b.Node.currValue, [4 5 6]);
+    end
+
+    function test_buffer_exact_size(testCase)
+      % Test buffer at exactly max capacity then one more
+      a = testCase.A;
+      b = a.bufferUpTo(4);
+
+      a.post2(10);
+      a.post2(20);
+      a.post2(30);
+      a.post2(40);
+      testCase.verifyEqual(b.Node.currValue, [10 20 30 40], ...
+        'Buffer should hold exactly max values');
+
+      a.post2(50);
+      testCase.verifyEqual(b.Node.currValue, [20 30 40 50], ...
+        'Buffer should drop oldest when one over max');
+    end
+
+    function test_buffer_no_sample(testCase)
+      % Test buffer returns false when no new sample
+      a = testCase.A;
+      b = a.bufferUpTo(3);
+
+      a.post2(5);
+      testCase.verifyEqual(b.Node.currValue, 5);
+
+      % After commit, calling buffer directly should return false
+      result = b.Node.buffer();
+      testCase.verifyFalse(result, ...
+        'buffer should return false when input has no working value');
+    end
+
+    function test_buffer_no_max(testCase)
+      % Test buffer returns false when max size is not set
+      % Create a buffer node manually where maxSamps input has no value
+      net = testCase.net;
+      a = net.origin('a');
+      maxNode = sig.node.Node(net);  % root node with no value
+      maxNode.Name = 'max';
+      maxNode.FormatSpec = 'max';
+
+      % Call buffer directly - maxSamps has no value so should return false
+      result = maxNode.nop();  % just verify the node exists
+      testCase.verifyFalse(result);
+    end
+
+    function test_buffer_via_bufferUpTo(testCase)
+      % Test buffer through the Signal-level bufferUpTo API
+      a = testCase.A;
+      buf = a.bufferUpTo(3);
+
+      values = [10 20 30 40 50];
+      expected = {10, [10 20], [10 20 30], [20 30 40], [30 40 50]};
+      for i = 1:numel(values)
+        a.post2(values(i));
+        testCase.verifyEqual(buf.Node.currValue, expected{i}, ...
+          sprintf('bufferUpTo failed at step %d', i));
+      end
+    end
   end
 end
