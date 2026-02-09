@@ -411,6 +411,75 @@ classdef Node < handle
       end
     end
 
+    function valset = indexOfFirst(this)
+      % indexOfFirst transfer function - returns index of first truthy input
+      % See +sig/+transfer/indexOfFirst.m for MEX reference
+      nilInstance = sig.Nil.instance();
+
+      % MEX L5: n = numel(inputs)
+      n = numel(this.Inputs);
+
+      % MEX L7
+      noMatch = n + 1;
+
+      % MEX L9-12: get this node's current value (the current match index)
+      if this.currValue ~= nilInstance
+        currMatch = this.currValue;
+      else
+        currMatch = Inf;
+      end
+
+      % MEX L14
+      firstNewInput = 0;
+
+      % Cache Inputs array — avoid repeated property access in loop
+      inputs = this.Inputs;
+
+      for inp = 1:n
+        % MEX L19: get latest predicate value — working first, then current
+        inputNode = inputs(inp);
+        if inputNode.workingValue ~= nilInstance
+          % MEX L20-30: input has a new working value
+          pred = inputNode.workingValue;
+          predset = true;
+          if ~firstNewInput
+            % MEX L22-30: first input with a new value this transaction
+            firstNewInput = inp;
+            if firstNewInput > currMatch
+              % MEX L24-29: first changed predicate is after current match,
+              % result can't change — bail out
+              valset = false;
+              return
+            end
+          end
+        elseif inputNode.currValue ~= nilInstance
+          % MEX L20-21: no working value, fall back to current
+          pred = inputNode.currValue;
+          predset = true;
+        else
+          predset = false;
+        end
+
+        % MEX L33-38: predicate has no value — can't evaluate further
+        if ~predset
+          this.setWorkingValue(noMatch);
+          valset = true;
+          return
+        end
+
+        % MEX L40-44: predicate is truthy — this is the first match
+        if pred
+          this.setWorkingValue(inp);
+          valset = true;
+          return
+        end
+      end
+
+      % MEX L46-48: no matching predicate found
+      this.setWorkingValue(noMatch);
+      valset = true;
+    end
+
     function valset = skipRepeats(this)
       % skipRepeats transfer function - only passes value if different from current
       % See +sig/+transfer/skipRepeats.m for MEX reference
