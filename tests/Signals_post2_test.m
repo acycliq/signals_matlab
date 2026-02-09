@@ -594,6 +594,94 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       end
     end
 
+    %% indexOfFirst Tests
+    function test_indexOfFirst_basic(testCase)
+      % First truthy input wins
+      [a, b, c] = deal(testCase.A, testCase.B, testCase.C);
+      idx = indexOfFirst(a, b, c);
+
+      a.post2(false);
+      b.post2(true);
+      c.post2(false);
+
+      testCase.verifyEqual(idx.Node.currValue, 2, ...
+        'indexOfFirst should return 2 (b is first truthy)');
+    end
+
+    function test_indexOfFirst_no_match(testCase)
+      % All false → returns N+1
+      [a, b, c] = deal(testCase.A, testCase.B, testCase.C);
+      idx = indexOfFirst(a, b, c);
+
+      a.post2(false);
+      b.post2(false);
+      c.post2(false);
+
+      testCase.verifyEqual(idx.Node.currValue, 4, ...
+        'indexOfFirst should return N+1 (4) when no match');
+    end
+
+    function test_indexOfFirst_first_input_truthy(testCase)
+      % First input is truthy → returns 1
+      [a, b] = deal(testCase.A, testCase.B);
+      idx = indexOfFirst(a, b);
+
+      a.post2(true);
+      b.post2(false);
+
+      testCase.verifyEqual(idx.Node.currValue, 1, ...
+        'indexOfFirst should return 1 when first input is truthy');
+    end
+
+    function test_indexOfFirst_unset_predicate(testCase)
+      % If a predicate has no value yet, return noMatch
+      % Only post to first input, leave second unset
+      [a, b] = deal(testCase.A, testCase.B);
+      idx = indexOfFirst(a, b);
+
+      a.post2(false);
+      % b never posted — its predicate is unset
+      % MEX L33-38: can't evaluate further, return noMatch
+      testCase.verifyEqual(idx.Node.currValue, 3, ...
+        'indexOfFirst should return N+1 (3) when predicate unset');
+    end
+
+    function test_indexOfFirst_match_changes(testCase)
+      % When match changes from later to earlier input
+      [a, b, c] = deal(testCase.A, testCase.B, testCase.C);
+      idx = indexOfFirst(a, b, c);
+
+      a.post2(false);
+      b.post2(false);
+      c.post2(true);
+      testCase.verifyEqual(idx.Node.currValue, 3, ...
+        'indexOfFirst should return 3 (c is first truthy)');
+
+      % Now a becomes truthy — should shift to 1
+      a.post2(true);
+      testCase.verifyEqual(idx.Node.currValue, 1, ...
+        'indexOfFirst should return 1 after a becomes truthy');
+    end
+
+    function test_indexOfFirst_early_exit(testCase)
+      % Tests the early exit optimization (MEX L24-29):
+      % If first changed predicate is after current match, result can't change
+      [a, b, c] = deal(testCase.A, testCase.B, testCase.C);
+      idx = indexOfFirst(a, b, c);
+
+      a.post2(true);
+      b.post2(false);
+      c.post2(false);
+      testCase.verifyEqual(idx.Node.currValue, 1, ...
+        'indexOfFirst should return 1 (a is truthy)');
+
+      % Now update c (index 3) — current match is 1, so 3 > 1 → early exit
+      % Result should remain 1
+      c.post2(true);
+      testCase.verifyEqual(idx.Node.currValue, 1, ...
+        'indexOfFirst should still be 1 (early exit, c change irrelevant)');
+    end
+
     %% skipRepeats Tests
     function test_skipRepeats_blocks_duplicates(testCase)
       % Test skipRepeats blocks repeated values
