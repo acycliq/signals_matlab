@@ -480,6 +480,42 @@ classdef Node < handle
       valset = true;
     end
 
+    function valset = keepWhen(this)
+      % keepWhen transfer function - passes 'what' value only when 'when' is truthy
+      % See +sig/+transfer/keepWhen.m for MEX reference
+      %
+      % this.Inputs(1) is 'what' - the value to gate
+      % this.Inputs(2) is 'when' - the gate signal
+      % Only passes 'what' working value (no current fallback for 'what')
+      nilInstance = sig.Nil.instance();
+
+      % MEX L25-28: get latest 'when' value — LATEST_VALUE pattern
+      nWhen = this.Inputs(2);
+      if nWhen.workingValue ~= nilInstance
+        when = nWhen.workingValue;
+      elseif nWhen.currValue ~= nilInstance
+        when = nWhen.currValue;
+      else
+        % MEX L30: whenwvset || whencvset fails — no value at all
+        valset = false;
+        return
+      end
+
+      % MEX L31: gate on 'when' being truthy
+      if when
+        % MEX L33-38: get 'what' WORKING value only (no current fallback)
+        nWhat = this.Inputs(1);
+        if nWhat.workingValue ~= nilInstance
+          this.setWorkingValue(nWhat.workingValue);
+          valset = true;
+          return
+        end
+      end
+
+      % MEX L44-45: all other paths — no output
+      valset = false;
+    end
+
     function valset = skipRepeats(this)
       % skipRepeats transfer function - only passes value if different from current
       % See +sig/+transfer/skipRepeats.m for MEX reference
