@@ -682,6 +682,73 @@ classdef Signals_post2_test < matlab.unittest.TestCase
         'indexOfFirst should still be 1 (early exit, c change irrelevant)');
     end
 
+    %% keepWhen Tests
+    function test_keepWhen_basic(testCase)
+      % Value passes through when gate is truthy
+      [a, b] = deal(testCase.A, testCase.B);
+      k = a.keepWhen(b);
+
+      b.post2(true);
+      a.post2(42);
+      testCase.verifyEqual(k.Node.currValue, 42, ...
+        'keepWhen should pass value when gate is true');
+    end
+
+    function test_keepWhen_gate_false(testCase)
+      % Value is blocked when gate is falsy
+      [a, b] = deal(testCase.A, testCase.B);
+      k = a.keepWhen(b);
+      nilInstance = sig.Nil.instance();
+
+      b.post2(false);
+      a.post2(42);
+      testCase.verifyTrue(k.Node.currValue == nilInstance, ...
+        'keepWhen should block value when gate is false');
+    end
+
+    function test_keepWhen_gate_changes(testCase)
+      % Gate going from true to false blocks subsequent values
+      [a, b] = deal(testCase.A, testCase.B);
+      k = a.keepWhen(b);
+
+      b.post2(true);
+      a.post2(10);
+      testCase.verifyEqual(k.Node.currValue, 10);
+
+      b.post2(false);
+      a.post2(20);
+      testCase.verifyEqual(k.Node.currValue, 10, ...
+        'keepWhen should still be 10 after gate went false');
+    end
+
+    function test_keepWhen_no_current_fallback(testCase)
+      % Unlike 'at', keepWhen does NOT fall back to 'what' current value.
+      % Only working value of 'what' passes through (MEX L33).
+      [a, b] = deal(testCase.A, testCase.B);
+      k = a.keepWhen(b);
+
+      % Set a's value first, then set gate — a has current but no working
+      a.post2(99);
+      b.post2(true);
+      % 'a' was posted in a previous transaction, so it has currValue but
+      % no workingValue in this transaction. keepWhen should NOT pass it.
+      nilInstance = sig.Nil.instance();
+      testCase.verifyTrue(k.Node.currValue == nilInstance, ...
+        'keepWhen should not fall back to current value of what');
+    end
+
+    function test_keepWhen_when_unset(testCase)
+      % When gate has no value at all, nothing passes
+      [a, b] = deal(testCase.A, testCase.B);
+      k = a.keepWhen(b);
+      nilInstance = sig.Nil.instance();
+
+      % Only post to 'what', gate never set
+      a.post2(42);
+      testCase.verifyTrue(k.Node.currValue == nilInstance, ...
+        'keepWhen should not pass when gate has no value');
+    end
+
     %% skipRepeats Tests
     function test_skipRepeats_blocks_duplicates(testCase)
       % Test skipRepeats blocks repeated values
