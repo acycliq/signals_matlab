@@ -139,7 +139,7 @@ classdef OriginSignal < sig.node.Signal
             if input.workingValue ~= sig.Nil.instance()
                 % Input has working value - it's ready
                 continue;
-            elseif input.currValue ~= sig.Nil.instance()
+            elseif input.CurrValue ~= sig.Nil.instance()
                 % Input has current value but no working value - it's ready
                 continue;
             else

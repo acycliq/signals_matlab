@@ -40,7 +40,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       a.post2(5);
       b.post2(3);
 
-      testCase.verifyEqual(c.Node.currValue, 8, ...
+      testCase.verifyEqual(c.Node.CurrValue, 8, ...
         'Failed basic addition with mapn');
     end
 
@@ -51,12 +51,12 @@ classdef Signals_post2_test < matlab.unittest.TestCase
 
       a.post2(5);
 
-      testCase.verifyTrue(c.Node.currValue == sig.Nil.instance(), ...
+      testCase.verifyTrue(c.Node.CurrValue == sig.Nil.instance(), ...
         'mapn should not compute with partial inputs');
 
       b.post2(3);
 
-      testCase.verifyEqual(c.Node.currValue, 8, ...
+      testCase.verifyEqual(c.Node.CurrValue, 8, ...
         'mapn should compute once all inputs have values');
     end
 
@@ -67,14 +67,14 @@ classdef Signals_post2_test < matlab.unittest.TestCase
 
       a.post2(5);
       b.post2(3);
-      testCase.verifyEqual(c.Node.currValue, 8);
+      testCase.verifyEqual(c.Node.CurrValue, 8);
 
       a.post2(10);
-      testCase.verifyEqual(c.Node.currValue, 13, ...
+      testCase.verifyEqual(c.Node.CurrValue, 13, ...
         'Failed to update when input changed');
 
       b.post2(7);
-      testCase.verifyEqual(c.Node.currValue, 17, ...
+      testCase.verifyEqual(c.Node.CurrValue, 17, ...
         'Failed to update when other input changed');
     end
 
@@ -89,7 +89,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       x.post2(3);  % x = 3
 
       % y = 5*9 + 2*3 + 8 = 45 + 6 + 8 = 59
-      testCase.verifyEqual(y.Node.currValue, 59, ...
+      testCase.verifyEqual(y.Node.CurrValue, 59, ...
         'Failed complex polynomial expression');
     end
 
@@ -105,9 +105,9 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       a.post2(xx);
       b.post2(yy);
 
-      testCase.verifyEqual(X.Node.currValue, expectedX, ...
+      testCase.verifyEqual(X.Node.CurrValue, expectedX, ...
         'meshgrid X output mismatch');
-      testCase.verifyEqual(Y.Node.currValue, expectedY, ...
+      testCase.verifyEqual(Y.Node.CurrValue, expectedY, ...
         'meshgrid Y output mismatch');
     end
 
@@ -118,7 +118,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
 
       a.post2(5);
       b.post2(3);
-      testCase.verifyEqual(c.Node.currValue, 8);
+      testCase.verifyEqual(c.Node.CurrValue, 8);
 
       % After commit, workingValue should be Nil
       testCase.verifyTrue(a.Node.workingValue == sig.Nil.instance(), ...
@@ -134,7 +134,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       arr = 1:5;
       a.post2(arr);
 
-      testCase.verifyEqual(b.Node.currValue, fliplr(arr), ...
+      testCase.verifyEqual(b.Node.CurrValue, fliplr(arr), ...
         'map should apply function to input');
     end
 
@@ -146,7 +146,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
 
       a.post2(1:3);
 
-      testCase.verifyEqual(b.Node.currValue, v, ...
+      testCase.verifyEqual(b.Node.CurrValue, v, ...
         'map should return constant regardless of input');
     end
 
@@ -156,10 +156,10 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       b = a.map(@(x) x * 2);
 
       a.post2(5);
-      testCase.verifyEqual(b.Node.currValue, 10);
+      testCase.verifyEqual(b.Node.CurrValue, 10);
 
       a.post2(7);
-      testCase.verifyEqual(b.Node.currValue, 14);
+      testCase.verifyEqual(b.Node.CurrValue, 14);
     end
 
     function test_map_no_working_value(testCase)
@@ -168,7 +168,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       b = a.map(@(x) x + 1);
 
       a.post2(5);
-      testCase.verifyEqual(b.Node.currValue, 6);
+      testCase.verifyEqual(b.Node.CurrValue, 6);
 
       % After commit, calling map directly should return false
       result = b.Node.map();
@@ -183,13 +183,13 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       m = merge(a, b, c);
 
       a.post2(10);
-      testCase.verifyEqual(m.Node.currValue, 10);
+      testCase.verifyEqual(m.Node.CurrValue, 10);
 
       b.post2(20);
-      testCase.verifyEqual(m.Node.currValue, 20);
+      testCase.verifyEqual(m.Node.CurrValue, 20);
 
       c.post2(30);
-      testCase.verifyEqual(m.Node.currValue, 30);
+      testCase.verifyEqual(m.Node.CurrValue, 30);
     end
 
     function test_merge_multiple_updates(testCase)
@@ -201,7 +201,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       for s = {c, b, a, b}
         v = randi(100);
         s{1}.post2(v);
-        testCase.verifyEqual(m.Node.currValue, v, ...
+        testCase.verifyEqual(m.Node.CurrValue, v, ...
           'merge should output most recently updated input');
       end
     end
@@ -212,7 +212,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       m = merge(a, b);
 
       a.post2(5);
-      testCase.verifyEqual(m.Node.currValue, 5);
+      testCase.verifyEqual(m.Node.CurrValue, 5);
 
       % After commit, calling merge directly should return false
       result = m.Node.merge();
@@ -228,7 +228,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
 
       b.post2(true);  % criterion = true, so pass when ischar(value) == true
       a.post2('hello');
-      testCase.verifyEqual(f.Node.currValue, 'hello', ...
+      testCase.verifyEqual(f.Node.CurrValue, 'hello', ...
         'filter should pass char when criterion is true');
     end
 
@@ -239,10 +239,10 @@ classdef Signals_post2_test < matlab.unittest.TestCase
 
       b.post2(true);  % criterion = true
       a.post2('hello');
-      testCase.verifyEqual(f.Node.currValue, 'hello');
+      testCase.verifyEqual(f.Node.CurrValue, 'hello');
 
       a.post2(123);  % ischar(123) == false, doesn't match criterion
-      testCase.verifyEqual(f.Node.currValue, 'hello', ...
+      testCase.verifyEqual(f.Node.CurrValue, 'hello', ...
         'filter should block non-char when criterion is true');
     end
 
@@ -253,11 +253,11 @@ classdef Signals_post2_test < matlab.unittest.TestCase
 
       b.post2(true);
       a.post2('text');
-      testCase.verifyEqual(f.Node.currValue, 'text');
+      testCase.verifyEqual(f.Node.CurrValue, 'text');
 
       b.post2(false);  % now pass when ischar(value) == false
       a.post2(42);
-      testCase.verifyEqual(f.Node.currValue, 42, ...
+      testCase.verifyEqual(f.Node.CurrValue, 42, ...
         'filter should pass number when criterion is false');
     end
 
@@ -268,7 +268,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
 
       b.post2(true);
       a.post2('test');
-      testCase.verifyEqual(f.Node.currValue, 'test');
+      testCase.verifyEqual(f.Node.CurrValue, 'test');
 
       result = f.Node.filter();
       testCase.verifyFalse(result, ...
@@ -282,11 +282,11 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       clickedPos = pos.at(click);
 
       pos.post2(100);
-      testCase.verifyTrue(clickedPos.Node.currValue == sig.Nil.instance(), ...
+      testCase.verifyTrue(clickedPos.Node.CurrValue == sig.Nil.instance(), ...
         'at should not fire until when is truthy');
 
       click.post2(true);
-      testCase.verifyEqual(clickedPos.Node.currValue, 100, ...
+      testCase.verifyEqual(clickedPos.Node.CurrValue, 100, ...
         'at should sample pos when click fires');
     end
 
@@ -298,7 +298,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       pos.post2(50);
       pos.post2(75);  % pos is now 75
       click.post2(true);
-      testCase.verifyEqual(clickedPos.Node.currValue, 75, ...
+      testCase.verifyEqual(clickedPos.Node.CurrValue, 75, ...
         'at should grab current pos value');
     end
 
@@ -309,11 +309,11 @@ classdef Signals_post2_test < matlab.unittest.TestCase
 
       pos.post2(100);
       click.post2(false);  % falsy - should not trigger
-      testCase.verifyTrue(clickedPos.Node.currValue == sig.Nil.instance(), ...
+      testCase.verifyTrue(clickedPos.Node.CurrValue == sig.Nil.instance(), ...
         'at should not fire when when is false');
 
       click.post2(0);  % also falsy
-      testCase.verifyTrue(clickedPos.Node.currValue == sig.Nil.instance(), ...
+      testCase.verifyTrue(clickedPos.Node.CurrValue == sig.Nil.instance(), ...
         'at should not fire when when is 0');
     end
 
@@ -324,12 +324,12 @@ classdef Signals_post2_test < matlab.unittest.TestCase
 
       pos.post2(10);
       click.post2(true);
-      testCase.verifyEqual(clickedPos.Node.currValue, 10);
+      testCase.verifyEqual(clickedPos.Node.CurrValue, 10);
 
       pos.post2(20);
       pos.post2(30);
       click.post2(true);
-      testCase.verifyEqual(clickedPos.Node.currValue, 30, ...
+      testCase.verifyEqual(clickedPos.Node.CurrValue, 30, ...
         'at should sample latest pos on second click');
     end
 
@@ -340,7 +340,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
 
       % click fires but pos was never set
       click.post2(true);
-      testCase.verifyTrue(clickedPos.Node.currValue == sig.Nil.instance(), ...
+      testCase.verifyTrue(clickedPos.Node.CurrValue == sig.Nil.instance(), ...
         'at should not fire if what has no value');
     end
 
@@ -363,7 +363,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
 
       a.post2(42);
 
-      testCase.verifyEqual(b.Node.currValue, a.Node.currValue, ...
+      testCase.verifyEqual(b.Node.CurrValue, a.Node.CurrValue, ...
         'identity should pass through value unchanged');
     end
 
@@ -375,7 +375,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       values = [1, 2, 3, 100, -5, 0];
       for v = values
         a.post2(v);
-        testCase.verifyEqual(b.Node.currValue, v, ...
+        testCase.verifyEqual(b.Node.CurrValue, v, ...
           sprintf('identity failed for value %d', v));
       end
     end
@@ -388,7 +388,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       arr = magic(3);
       a.post2(arr);
 
-      testCase.verifyEqual(b.Node.currValue, arr, ...
+      testCase.verifyEqual(b.Node.CurrValue, arr, ...
         'identity should handle array values');
     end
 
@@ -398,7 +398,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       b = a.identity();
 
       a.post2(5);
-      testCase.verifyEqual(b.Node.currValue, 5);
+      testCase.verifyEqual(b.Node.CurrValue, 5);
 
       % After commit, calling identity should return false
       result = b.Node.identity();
@@ -433,11 +433,11 @@ classdef Signals_post2_test < matlab.unittest.TestCase
 
       a.post2(5);
       b.post2(3);
-      testCase.verifyEqual(c.Node.currValue, 8);
+      testCase.verifyEqual(c.Node.CurrValue, 8);
 
       % When we post to a, a.workingValue is used, b.currValue is used
       a.post2(10);
-      testCase.verifyEqual(c.Node.currValue, 13, ...
+      testCase.verifyEqual(c.Node.CurrValue, 13, ...
         'LATEST_VALUE should use workingValue when available');
     end
 
@@ -453,7 +453,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       testCase.verifyTrue(c.Node.workingValue == sig.Nil.instance(), ...
         'workingValue should be cleared after commit');
 
-      testCase.verifyEqual(c.Node.currValue, 8, ...
+      testCase.verifyEqual(c.Node.CurrValue, 8, ...
         'currValue should have committed result');
     end
 
@@ -469,11 +469,11 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       e = d - 5;      % e = 6a - 2
 
       a.post2(10);
-      testCase.verifyEqual(e.Node.currValue, 58, ...  % 6*10 - 2
+      testCase.verifyEqual(e.Node.CurrValue, 58, ...  % 6*10 - 2
         'Deep network propagation failed');
 
       a.post2(5);
-      testCase.verifyEqual(e.Node.currValue, 28, ...  % 6*5 - 2
+      testCase.verifyEqual(e.Node.CurrValue, 28, ...  % 6*5 - 2
         'Deep network update propagation failed');
     end
 
@@ -491,11 +491,11 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       d = b + c;  % d = 2a + (a + 1) = 3a + 1
 
       a.post2(5);
-      testCase.verifyEqual(d.Node.currValue, 16, ...  % 3*5 + 1
+      testCase.verifyEqual(d.Node.CurrValue, 16, ...  % 3*5 + 1
         'Diamond dependency calculation failed');
 
       a.post2(10);
-      testCase.verifyEqual(d.Node.currValue, 31, ...  % 3*10 + 1
+      testCase.verifyEqual(d.Node.CurrValue, 31, ...  % 3*10 + 1
         'Diamond dependency update failed');
     end
 
@@ -506,13 +506,13 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       b = a.bufferUpTo(5);
 
       a.post2(10);
-      testCase.verifyEqual(b.Node.currValue, 10);
+      testCase.verifyEqual(b.Node.CurrValue, 10);
 
       a.post2(20);
-      testCase.verifyEqual(b.Node.currValue, [10 20]);
+      testCase.verifyEqual(b.Node.CurrValue, [10 20]);
 
       a.post2(30);
-      testCase.verifyEqual(b.Node.currValue, [10 20 30]);
+      testCase.verifyEqual(b.Node.CurrValue, [10 20 30]);
     end
 
     function test_buffer_overflow(testCase)
@@ -523,16 +523,16 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       a.post2(1);
       a.post2(2);
       a.post2(3);
-      testCase.verifyEqual(b.Node.currValue, [1 2 3]);
+      testCase.verifyEqual(b.Node.CurrValue, [1 2 3]);
 
       a.post2(4);
-      testCase.verifyEqual(b.Node.currValue, [2 3 4]);
+      testCase.verifyEqual(b.Node.CurrValue, [2 3 4]);
 
       a.post2(5);
-      testCase.verifyEqual(b.Node.currValue, [3 4 5]);
+      testCase.verifyEqual(b.Node.CurrValue, [3 4 5]);
 
       a.post2(6);
-      testCase.verifyEqual(b.Node.currValue, [4 5 6]);
+      testCase.verifyEqual(b.Node.CurrValue, [4 5 6]);
     end
 
     function test_buffer_exact_size(testCase)
@@ -544,11 +544,11 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       a.post2(20);
       a.post2(30);
       a.post2(40);
-      testCase.verifyEqual(b.Node.currValue, [10 20 30 40], ...
+      testCase.verifyEqual(b.Node.CurrValue, [10 20 30 40], ...
         'Buffer should hold exactly max values');
 
       a.post2(50);
-      testCase.verifyEqual(b.Node.currValue, [20 30 40 50], ...
+      testCase.verifyEqual(b.Node.CurrValue, [20 30 40 50], ...
         'Buffer should drop oldest when one over max');
     end
 
@@ -558,7 +558,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       b = a.bufferUpTo(3);
 
       a.post2(5);
-      testCase.verifyEqual(b.Node.currValue, 5);
+      testCase.verifyEqual(b.Node.CurrValue, 5);
 
       % After commit, calling buffer directly should return false
       result = b.Node.buffer();
@@ -589,7 +589,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       expected = {10, [10 20], [10 20 30], [20 30 40], [30 40 50]};
       for i = 1:numel(values)
         a.post2(values(i));
-        testCase.verifyEqual(buf.Node.currValue, expected{i}, ...
+        testCase.verifyEqual(buf.Node.CurrValue, expected{i}, ...
           sprintf('bufferUpTo failed at step %d', i));
       end
     end
@@ -604,7 +604,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       b.post2(true);
       c.post2(false);
 
-      testCase.verifyEqual(idx.Node.currValue, 2, ...
+      testCase.verifyEqual(idx.Node.CurrValue, 2, ...
         'indexOfFirst should return 2 (b is first truthy)');
     end
 
@@ -617,7 +617,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       b.post2(false);
       c.post2(false);
 
-      testCase.verifyEqual(idx.Node.currValue, 4, ...
+      testCase.verifyEqual(idx.Node.CurrValue, 4, ...
         'indexOfFirst should return N+1 (4) when no match');
     end
 
@@ -629,7 +629,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       a.post2(true);
       b.post2(false);
 
-      testCase.verifyEqual(idx.Node.currValue, 1, ...
+      testCase.verifyEqual(idx.Node.CurrValue, 1, ...
         'indexOfFirst should return 1 when first input is truthy');
     end
 
@@ -642,7 +642,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       a.post2(false);
       % b never posted — its predicate is unset
       % MEX L33-38: can't evaluate further, return noMatch
-      testCase.verifyEqual(idx.Node.currValue, 3, ...
+      testCase.verifyEqual(idx.Node.CurrValue, 3, ...
         'indexOfFirst should return N+1 (3) when predicate unset');
     end
 
@@ -654,12 +654,12 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       a.post2(false);
       b.post2(false);
       c.post2(true);
-      testCase.verifyEqual(idx.Node.currValue, 3, ...
+      testCase.verifyEqual(idx.Node.CurrValue, 3, ...
         'indexOfFirst should return 3 (c is first truthy)');
 
       % Now a becomes truthy — should shift to 1
       a.post2(true);
-      testCase.verifyEqual(idx.Node.currValue, 1, ...
+      testCase.verifyEqual(idx.Node.CurrValue, 1, ...
         'indexOfFirst should return 1 after a becomes truthy');
     end
 
@@ -672,13 +672,13 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       a.post2(true);
       b.post2(false);
       c.post2(false);
-      testCase.verifyEqual(idx.Node.currValue, 1, ...
+      testCase.verifyEqual(idx.Node.CurrValue, 1, ...
         'indexOfFirst should return 1 (a is truthy)');
 
       % Now update c (index 3) — current match is 1, so 3 > 1 → early exit
       % Result should remain 1
       c.post2(true);
-      testCase.verifyEqual(idx.Node.currValue, 1, ...
+      testCase.verifyEqual(idx.Node.CurrValue, 1, ...
         'indexOfFirst should still be 1 (early exit, c change irrelevant)');
     end
 
@@ -690,7 +690,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
 
       b.post2(true);
       a.post2(42);
-      testCase.verifyEqual(k.Node.currValue, 42, ...
+      testCase.verifyEqual(k.Node.CurrValue, 42, ...
         'keepWhen should pass value when gate is true');
     end
 
@@ -702,7 +702,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
 
       b.post2(false);
       a.post2(42);
-      testCase.verifyTrue(k.Node.currValue == nilInstance, ...
+      testCase.verifyTrue(k.Node.CurrValue == nilInstance, ...
         'keepWhen should block value when gate is false');
     end
 
@@ -713,11 +713,11 @@ classdef Signals_post2_test < matlab.unittest.TestCase
 
       b.post2(true);
       a.post2(10);
-      testCase.verifyEqual(k.Node.currValue, 10);
+      testCase.verifyEqual(k.Node.CurrValue, 10);
 
       b.post2(false);
       a.post2(20);
-      testCase.verifyEqual(k.Node.currValue, 10, ...
+      testCase.verifyEqual(k.Node.CurrValue, 10, ...
         'keepWhen should still be 10 after gate went false');
     end
 
@@ -733,7 +733,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       % 'a' was posted in a previous transaction, so it has currValue but
       % no workingValue in this transaction. keepWhen should NOT pass it.
       nilInstance = sig.Nil.instance();
-      testCase.verifyTrue(k.Node.currValue == nilInstance, ...
+      testCase.verifyTrue(k.Node.CurrValue == nilInstance, ...
         'keepWhen should not fall back to current value of what');
     end
 
@@ -745,7 +745,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
 
       % Only post to 'what', gate never set
       a.post2(42);
-      testCase.verifyTrue(k.Node.currValue == nilInstance, ...
+      testCase.verifyTrue(k.Node.CurrValue == nilInstance, ...
         'keepWhen should not pass when gate has no value');
     end
 
@@ -756,10 +756,10 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       nr = a.skipRepeats();
 
       a.post2(5);
-      testCase.verifyEqual(nr.Node.currValue, 5);
+      testCase.verifyEqual(nr.Node.CurrValue, 5);
 
       a.post2(5);  % same value — should be blocked
-      testCase.verifyEqual(nr.Node.currValue, 5, ...
+      testCase.verifyEqual(nr.Node.CurrValue, 5, ...
         'skipRepeats should still be 5, not re-propagated');
     end
 
@@ -769,10 +769,10 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       nr = a.skipRepeats();
 
       a.post2(5);
-      testCase.verifyEqual(nr.Node.currValue, 5);
+      testCase.verifyEqual(nr.Node.CurrValue, 5);
 
       a.post2(10);
-      testCase.verifyEqual(nr.Node.currValue, 10, ...
+      testCase.verifyEqual(nr.Node.CurrValue, 10, ...
         'skipRepeats should pass through different value');
     end
 
@@ -782,7 +782,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       nr = a.skipRepeats();
 
       a.post2(42);
-      testCase.verifyEqual(nr.Node.currValue, 42, ...
+      testCase.verifyEqual(nr.Node.CurrValue, 42, ...
         'First value should always pass through');
     end
 
@@ -792,13 +792,13 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       nr = a.skipRepeats();
 
       a.post2([1 2 3]);
-      testCase.verifyEqual(nr.Node.currValue, [1 2 3]);
+      testCase.verifyEqual(nr.Node.CurrValue, [1 2 3]);
 
       a.post2([1 2 3]);  % same array — blocked
-      testCase.verifyEqual(nr.Node.currValue, [1 2 3]);
+      testCase.verifyEqual(nr.Node.CurrValue, [1 2 3]);
 
       a.post2([1 2 4]);  % different array — passes
-      testCase.verifyEqual(nr.Node.currValue, [1 2 4]);
+      testCase.verifyEqual(nr.Node.CurrValue, [1 2 4]);
     end
 
     function test_skipRepeats_no_working_value(testCase)
@@ -807,7 +807,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       nr = a.skipRepeats();
 
       a.post2(5);
-      testCase.verifyEqual(nr.Node.currValue, 5);
+      testCase.verifyEqual(nr.Node.CurrValue, 5);
 
       % After commit, calling skipRepeats directly should return false
       result = nr.Node.skipRepeats();

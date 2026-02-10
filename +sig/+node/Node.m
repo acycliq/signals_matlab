@@ -10,7 +10,7 @@ classdef Node < handle
     transArg
     transferMethodHandle  % Method handle
     Id
-    currValue = sig.Nil.instance()
+    CurrValue = sig.Nil.instance()
     workingValue = sig.Nil.instance() % Working value for two-phase computation
     queued = false       % mex-style queued flag: true if node is currently in processing queue, false otherwise
                          % Its role is to prevents duplicate queuing during signal propagation
@@ -123,7 +123,7 @@ classdef Node < handle
     
     function setCurrValue(this, value)
         % Setter for current values
-        this.currValue = value;
+        this.CurrValue = value;
     end
     
     function setWorkingValue(this, value)
@@ -158,9 +158,9 @@ classdef Node < handle
           % Input has a working value (new value) - use it
           inpvals{inp} = node.workingValue;
           hasWorkingValue(inp) = true;
-        elseif node.currValue ~= nilInstance
+        elseif node.CurrValue ~= nilInstance
           % Fall back to current value (MEX LATEST_VALUE behavior)
-          inpvals{inp} = node.currValue;
+          inpvals{inp} = node.CurrValue;
           hasWorkingValue(inp) = false;  % Constants don't trigger, but provide values
         else
           % No value at all - can't compute
@@ -207,7 +207,7 @@ classdef Node < handle
           % Input has a working value (new value) - use it and compute
           this.setWorkingValue(input.workingValue);
           valset = true;
-        elseif input.currValue ~= nilInstance
+        elseif input.CurrValue ~= nilInstance
           % Input has current value but no working value - don't compute (no change)
           valset = false;
         else
@@ -285,8 +285,8 @@ classdef Node < handle
       nCondition = this.Inputs(2);
       if nCondition.workingValue ~= nilInstance
         condition = nCondition.workingValue;
-      elseif nCondition.currValue ~= nilInstance
-        condition = nCondition.currValue;
+      elseif nCondition.CurrValue ~= nilInstance
+        condition = nCondition.CurrValue;
       else
         valset = false;
         return
@@ -341,8 +341,8 @@ classdef Node < handle
             this.setWorkingValue(nWhat.workingValue);
             valset = true;
             return
-          elseif nWhat.currValue ~= nilInstance
-            this.setWorkingValue(nWhat.currValue);
+          elseif nWhat.CurrValue ~= nilInstance
+            this.setWorkingValue(nWhat.CurrValue);
             valset = true;
             return
           end
@@ -365,8 +365,8 @@ classdef Node < handle
       if nMaxSamps.workingValue ~= nilInstance
         maxSamps = nMaxSamps.workingValue;
         % No zero check here — matches MEX (zero check only in currValue branch)
-      elseif nMaxSamps.currValue ~= nilInstance
-        maxSamps = nMaxSamps.currValue;
+      elseif nMaxSamps.CurrValue ~= nilInstance
+        maxSamps = nMaxSamps.CurrValue;
         if ~maxSamps  % zero check matches MEX L29
           valset = false;
           return
@@ -379,8 +379,8 @@ classdef Node < handle
       % MEX L35: Get current buffer contents from this node's own currValue
       % In MEX, currNodeValue returns [] when no value set yet.
       % Here currValue is Nil initially, so convert to [] for first call.
-      if this.currValue ~= nilInstance
-        buff = this.currValue;
+      if this.CurrValue ~= nilInstance
+        buff = this.CurrValue;
       else
         buff = [];
       end
@@ -423,8 +423,8 @@ classdef Node < handle
       noMatch = n + 1;
 
       % MEX L9-12: get this node's current value (the current match index)
-      if this.currValue ~= nilInstance
-        currMatch = this.currValue;
+      if this.CurrValue ~= nilInstance
+        currMatch = this.CurrValue;
       else
         currMatch = Inf;
       end
@@ -452,9 +452,9 @@ classdef Node < handle
               return
             end
           end
-        elseif inputNode.currValue ~= nilInstance
+        elseif inputNode.CurrValue ~= nilInstance
           % MEX L20-21: no working value, fall back to current
-          pred = inputNode.currValue;
+          pred = inputNode.CurrValue;
           predset = true;
         else
           predset = false;
@@ -493,8 +493,8 @@ classdef Node < handle
       nWhen = this.Inputs(2);
       if nWhen.workingValue ~= nilInstance
         when = nWhen.workingValue;
-      elseif nWhen.currValue ~= nilInstance
-        when = nWhen.currValue;
+      elseif nWhen.CurrValue ~= nilInstance
+        when = nWhen.CurrValue;
       else
         % MEX L30: whenwvset || whencvset fails — no value at all
         valset = false;
@@ -530,7 +530,7 @@ classdef Node < handle
         % MEX L10-11: Compare against this node's own currValue
         % ~cvset (Nil) means no current value yet — always pass through
         % ~isequal means value changed — pass through
-        if this.currValue == nilInstance || ~isequal(wv, this.currValue)
+        if this.CurrValue == nilInstance || ~isequal(wv, this.CurrValue)
           this.setWorkingValue(wv);
           valset = true;
           return
