@@ -540,6 +540,43 @@ classdef Node < handle
       valset = false;
     end
 
+    function valset = latch(this)
+      % latch transfer function - arms on first input, releases on second
+      % See +sig/+transfer/latch.m for MEX reference
+      %
+      % this.Inputs(1) is 'arm' - arms the latch when truthy
+      % this.Inputs(2) is 'release' - releases the latch when truthy
+      % this.CurrValue holds the armed state (initialised to false by Signal.m)
+      %
+      % Only reacts to working values (no LATEST_VALUE fallback) — latch
+      % cares about fresh updates in this transaction, not stale values.
+      nilInstance = sig.Nil.instance();
+
+      % MEX L6-7: working values only
+      armWV = this.Inputs(1).workingValue;
+      releaseWV = this.Inputs(2).workingValue;
+      armSet = armWV ~= nilInstance;
+      releaseSet = releaseWV ~= nilInstance;
+
+      % MEX L10: current armed state from this node's own CurrValue
+      armed = this.CurrValue;
+
+      % MEX L12-13: input must be set AND truthy (posting 0 is ignored)
+      tryArm = armSet && armWV;
+      tryRelease = releaseSet && releaseWV;
+
+      % MEX L15-27: release takes priority over arming
+      if tryRelease && (tryArm || armed)
+        this.setWorkingValue(false);
+        valset = true;
+      elseif ~armed && tryArm
+        this.setWorkingValue(true);
+        valset = true;
+      else
+        valset = false;
+      end
+    end
+
 
   end
 
