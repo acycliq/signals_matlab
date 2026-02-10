@@ -577,6 +577,32 @@ classdef Node < handle
       end
     end
 
+    function valset = log(this)
+      % log transfer function - timestamps and logs each new value
+      % See +sig/+transfer/log.m for MEX reference
+      %
+      % Assumes one input. this.transArg is a clock function (default @GetSecs).
+      % When input has a working value, appends struct('time', clock(), 'value', wv)
+      % to the existing log array.
+      % this.CurrValue is initialised to struct('time', {}, 'value', {}) by Signal.m.
+      %
+      % In MEX, the transfer returns a single struct and appendValues=true
+      % makes the apply phase concatenate. Here we accumulate directly.
+
+      % MEX L5: working value only (no LATEST_VALUE fallback)
+      nilInstance = sig.Nil.instance();
+      wv = this.Inputs(1).workingValue;
+      if wv ~= nilInstance
+        % MEX L9: create timestamped entry
+        entry = struct('time', this.transArg(), 'value', wv);
+        % Accumulate onto existing log (MEX does this via appendValues in apply phase)
+        this.setWorkingValue([this.CurrValue entry]);
+        valset = true;
+      else
+        valset = false;
+      end
+    end
+
 
   end
 
