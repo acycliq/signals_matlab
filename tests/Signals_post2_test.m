@@ -931,5 +931,88 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       testCase.verifyFalse(p.Node.CurrValue, ...
         'When both arm and release fire simultaneously, release should win');
     end
+
+    %% log tests
+    function test_log_basic(testCase)
+      % Each posted value gets timestamped and stored
+      net = testCase.net;
+      a = net.origin('a');
+      clk = containers.Map('KeyType','char','ValueType','double');
+      clk('t') = 0;
+      clockFun = @() clk('t');  % handle object — mutations visible to closure
+      lg = a.log(clockFun);
+
+      % Initial CurrValue is an empty struct array
+      testCase.verifyTrue(isempty(lg.Node.CurrValue), ...
+        'Log should start empty');
+
+      clk('t') = 1.0;
+      a.post2(42);
+      result = lg.Node.CurrValue;
+      testCase.verifyEqual(result.time, 1.0, ...
+        'Timestamp should come from clock function');
+      testCase.verifyEqual(result.value, 42, ...
+        'Logged value should match posted value');
+    end
+
+    function test_log_multiple_values(testCase)
+      % Log captures each value with its timestamp
+      net = testCase.net;
+      a = net.origin('a');
+      clk = containers.Map('KeyType','char','ValueType','double');
+      clk('t') = 0;
+      clockFun = @() clk('t');
+      lg = a.log(clockFun);
+
+      clk('t') = 0.5;
+      a.post2(10);
+      clk('t') = 1.5;
+      a.post2(20);
+      clk('t') = 2.5;
+      a.post2(30);
+
+      result = lg.Node.CurrValue;
+      testCase.verifyEqual(numel(result), 3, ...
+        'Log should have 3 entries');
+      testCase.verifyEqual([result.time], [0.5 1.5 2.5], ...
+        'Timestamps should accumulate in order');
+      testCase.verifyEqual([result.value], [10 20 30], ...
+        'Values should accumulate in order');
+    end
+
+    function test_log_no_working_value(testCase)
+      % Log should not fire when input has no working value
+      net = testCase.net;
+      a = net.origin('a');
+      clockFun = @() 0;
+      lg = a.log(clockFun);
+
+      % Don't post anything — log should stay empty
+      result = lg.Node.log();
+      testCase.verifyFalse(result, ...
+        'Log should return false when input has no working value');
+    end
+
+    function test_log_different_types(testCase)
+      % Log should work with any value type (string, array, etc.)
+      net = testCase.net;
+      a = net.origin('a');
+      clk = containers.Map('KeyType','char','ValueType','double');
+      clk('t') = 0;
+      clockFun = @() clk('t');
+      lg = a.log(clockFun);
+
+      clk('t') = 1.0;
+      a.post2('hello');
+      result = lg.Node.CurrValue;
+      testCase.verifyEqual(result(end).value, 'hello', ...
+        'Log should handle string values');
+
+      clk('t') = 2.0;
+      a.post2([1 2 3]);
+      result = lg.Node.CurrValue;
+      testCase.verifyEqual(result(end).value, [1 2 3], ...
+        'Log should handle array values');
+    end
   end
 end
