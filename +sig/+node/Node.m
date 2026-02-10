@@ -28,6 +28,7 @@ classdef Node < handle
   
   properties (Dependent)
     Name
+    CurrValueSet
   end
   
   properties (Access = private)
@@ -99,6 +100,10 @@ classdef Node < handle
       end
     end
     
+    function tf = get.CurrValueSet(this)
+      tf = this.CurrValue ~= sig.Nil.instance();
+    end
+
     function set.Name(this, v)
       this.NameOverride = v;
     end
