@@ -814,5 +814,122 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       testCase.verifyFalse(result, ...
         'skipRepeats should return false when input has no working value');
     end
+
+    %% latch tests
+    function test_latch_arm_then_release(testCase)
+      % Basic arm/release cycle: arm fires truthy, then release fires truthy
+      net = testCase.net;
+      arm = net.origin('arm');
+      release = net.origin('release');
+      p = arm.to(release);
+
+      % Initially not armed
+      testCase.verifyFalse(p.Node.CurrValue, ...
+        'Latch should start as false');
+
+      % Arm with truthy value
+      arm.post2(1);
+      testCase.verifyTrue(p.Node.CurrValue, ...
+        'Latch should be true after arming');
+
+      % Release with truthy value
+      release.post2(1);
+      testCase.verifyFalse(p.Node.CurrValue, ...
+        'Latch should be false after releasing');
+    end
+
+    function test_latch_zero_arm_ignored(testCase)
+      % Posting 0 (non-truthy) to arm should not arm the latch
+      net = testCase.net;
+      arm = net.origin('arm');
+      release = net.origin('release');
+      p = arm.to(release);
+
+      arm.post2(0);
+      testCase.verifyFalse(p.Node.CurrValue, ...
+        'Posting 0 to arm should not arm the latch');
+    end
+
+    function test_latch_zero_release_ignored(testCase)
+      % Posting 0 to release should not release an armed latch
+      net = testCase.net;
+      arm = net.origin('arm');
+      release = net.origin('release');
+      p = arm.to(release);
+
+      arm.post2(1);
+      testCase.verifyTrue(p.Node.CurrValue);
+
+      release.post2(0);
+      testCase.verifyTrue(p.Node.CurrValue, ...
+        'Posting 0 to release should not release the latch');
+    end
+
+    function test_latch_rearm_when_armed_is_noop(testCase)
+      % Posting truthy to arm again when already armed should not change state
+      net = testCase.net;
+      arm = net.origin('arm');
+      release = net.origin('release');
+      p = arm.to(release);
+
+      arm.post2(1);
+      testCase.verifyTrue(p.Node.CurrValue);
+
+      % Arm again — should be a no-op (valset = false, no propagation)
+      arm.post2(5);
+      testCase.verifyTrue(p.Node.CurrValue, ...
+        'Re-arming when already armed should not change state');
+    end
+
+    function test_latch_release_without_arm_is_noop(testCase)
+      % Releasing when not armed should not change state
+      net = testCase.net;
+      arm = net.origin('arm');
+      release = net.origin('release');
+      p = arm.to(release);
+
+      release.post2(1);
+      testCase.verifyFalse(p.Node.CurrValue, ...
+        'Releasing when not armed should not change state');
+    end
+
+    function test_latch_multiple_cycles(testCase)
+      % Full arm/release/re-arm/re-release cycle
+      net = testCase.net;
+      arm = net.origin('arm');
+      release = net.origin('release');
+      p = arm.to(release);
+
+      % Cycle 1
+      arm.post2(1);
+      testCase.verifyTrue(p.Node.CurrValue);
+      release.post2(1);
+      testCase.verifyFalse(p.Node.CurrValue);
+
+      % Cycle 2
+      arm.post2(3);
+      testCase.verifyTrue(p.Node.CurrValue, ...
+        'Should re-arm after being released');
+      release.post2(7);
+      testCase.verifyFalse(p.Node.CurrValue, ...
+        'Should release again in second cycle');
+    end
+
+    function test_latch_simultaneous_arm_and_release(testCase)
+      % MEX L15: when both arm AND release fire truthy in same transaction,
+      % release wins — output is false.
+      % We wire both inputs from the same origin so a single post2 gives
+      % both inputs working values in the same BFS pass.
+      net = testCase.net;
+      x = net.origin('x');
+      arm = x.map(@(v) v);      % identity — follows x
+      release = x.map(@(v) v);   % identity — also follows x
+      p = arm.to(release);
+
+      % Both arm and release get working value 1 in the same transaction
+      x.post2(1);
+      testCase.verifyFalse(p.Node.CurrValue, ...
+        'When both arm and release fire simultaneously, release should win');
+    end
   end
 end
