@@ -283,7 +283,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
 
       pos.post2(100);
       testCase.verifyTrue(clickedPos.Node.CurrValue == sig.Nil.instance(), ...
-        'at should not fire until when is truthy');
+        'at should not fire until when is true');
 
       click.post2(true);
       testCase.verifyEqual(clickedPos.Node.CurrValue, 100, ...
@@ -302,17 +302,17 @@ classdef Signals_post2_test < matlab.unittest.TestCase
         'at should grab current pos value');
     end
 
-    function test_at_ignores_falsy_when(testCase)
-      % Test at does nothing when 'when' is falsy
+    function test_at_ignores_false_when(testCase)
+      % Test at does nothing when 'when' is false
       [pos, click] = deal(testCase.A, testCase.B);
       clickedPos = pos.at(click);
 
       pos.post2(100);
-      click.post2(false);  % falsy - should not trigger
+      click.post2(false);  % false - should not trigger
       testCase.verifyTrue(clickedPos.Node.CurrValue == sig.Nil.instance(), ...
         'at should not fire when when is false');
 
-      click.post2(0);  % also falsy
+      click.post2(0);  % also false
       testCase.verifyTrue(clickedPos.Node.CurrValue == sig.Nil.instance(), ...
         'at should not fire when when is 0');
     end
@@ -596,7 +596,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
 
     %% indexOfFirst Tests
     function test_indexOfFirst_basic(testCase)
-      % First truthy input wins
+      % First true input wins
       [a, b, c] = deal(testCase.A, testCase.B, testCase.C);
       idx = indexOfFirst(a, b, c);
 
@@ -605,7 +605,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       c.post2(false);
 
       testCase.verifyEqual(idx.Node.CurrValue, 2, ...
-        'indexOfFirst should return 2 (b is first truthy)');
+        'indexOfFirst should return 2 (b is first true)');
     end
 
     function test_indexOfFirst_no_match(testCase)
@@ -621,8 +621,8 @@ classdef Signals_post2_test < matlab.unittest.TestCase
         'indexOfFirst should return N+1 (4) when no match');
     end
 
-    function test_indexOfFirst_first_input_truthy(testCase)
-      % First input is truthy → returns 1
+    function test_indexOfFirst_first_input_true(testCase)
+      % First input is true → returns 1
       [a, b] = deal(testCase.A, testCase.B);
       idx = indexOfFirst(a, b);
 
@@ -630,7 +630,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       b.post2(false);
 
       testCase.verifyEqual(idx.Node.CurrValue, 1, ...
-        'indexOfFirst should return 1 when first input is truthy');
+        'indexOfFirst should return 1 when first input is true');
     end
 
     function test_indexOfFirst_unset_predicate(testCase)
@@ -655,12 +655,12 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       b.post2(false);
       c.post2(true);
       testCase.verifyEqual(idx.Node.CurrValue, 3, ...
-        'indexOfFirst should return 3 (c is first truthy)');
+        'indexOfFirst should return 3 (c is first true)');
 
-      % Now a becomes truthy — should shift to 1
+      % Now a becomes true — should shift to 1
       a.post2(true);
       testCase.verifyEqual(idx.Node.CurrValue, 1, ...
-        'indexOfFirst should return 1 after a becomes truthy');
+        'indexOfFirst should return 1 after a becomes true');
     end
 
     function test_indexOfFirst_early_exit(testCase)
@@ -673,7 +673,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       b.post2(false);
       c.post2(false);
       testCase.verifyEqual(idx.Node.CurrValue, 1, ...
-        'indexOfFirst should return 1 (a is truthy)');
+        'indexOfFirst should return 1 (a is true)');
 
       % Now update c (index 3) — current match is 1, so 3 > 1 → early exit
       % Result should remain 1
@@ -684,7 +684,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
 
     %% keepWhen Tests
     function test_keepWhen_basic(testCase)
-      % Value passes through when gate is truthy
+      % Value passes through when gate is true
       [a, b] = deal(testCase.A, testCase.B);
       k = a.keepWhen(b);
 
@@ -695,7 +695,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
     end
 
     function test_keepWhen_gate_false(testCase)
-      % Value is blocked when gate is falsy
+      % Value is blocked when gate is false
       [a, b] = deal(testCase.A, testCase.B);
       k = a.keepWhen(b);
       nilInstance = sig.Nil.instance();
@@ -817,7 +817,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
 
     %% latch tests
     function test_latch_arm_then_release(testCase)
-      % Basic arm/release cycle: arm fires truthy, then release fires truthy
+      % Basic arm/release cycle: arm fires true, then release fires true
       net = testCase.net;
       arm = net.origin('arm');
       release = net.origin('release');
@@ -827,19 +827,19 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       testCase.verifyFalse(p.Node.CurrValue, ...
         'Latch should start as false');
 
-      % Arm with truthy value
+      % Arm with true value
       arm.post2(1);
       testCase.verifyTrue(p.Node.CurrValue, ...
         'Latch should be true after arming');
 
-      % Release with truthy value
+      % Release with true value
       release.post2(1);
       testCase.verifyFalse(p.Node.CurrValue, ...
         'Latch should be false after releasing');
     end
 
     function test_latch_zero_arm_ignored(testCase)
-      % Posting 0 (non-truthy) to arm should not arm the latch
+      % Posting 0 (non-true) to arm should not arm the latch
       net = testCase.net;
       arm = net.origin('arm');
       release = net.origin('release');
@@ -866,7 +866,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
     end
 
     function test_latch_rearm_when_armed_is_noop(testCase)
-      % Posting truthy to arm again when already armed should not change state
+      % Posting true to arm again when already armed should not change state
       net = testCase.net;
       arm = net.origin('arm');
       release = net.origin('release');
@@ -916,7 +916,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
     end
 
     function test_latch_simultaneous_arm_and_release(testCase)
-      % MEX L15: when both arm AND release fire truthy in same transaction,
+      % MEX L15: when both arm AND release fire true in same transaction,
       % release wins — output is false.
       % We wire both inputs from the same origin so a single post2 gives
       % both inputs working values in the same BFS pass.

@@ -312,7 +312,7 @@ classdef Node < handle
     end
 
     function valset = at(this)
-      % at transfer function - samples 'what' when 'when' becomes truthy
+      % at transfer function - samples 'what' when 'when' becomes true
       % See +sig/+transfer/at.m for MEX reference
       %
       % this.Inputs(1) is 'what' - the value to sample
@@ -333,7 +333,7 @@ classdef Node < handle
           error('signals:at:nonScalarWhen', ...
             'at: ''when'' must be scalar, got [%s]', num2str(size(whenWorking)));
         end
-        if whenWorking  % when is truthy
+        if whenWorking  % when is non-zero
           % Now get 'what' value - try working first, fall back to current
           % MEX does: [what, whatset] = workingNodeValue(...) then currNodeValue(...)
           nWhat = this.Inputs(1);
@@ -412,7 +412,7 @@ classdef Node < handle
     end
 
     function valset = indexOfFirst(this)
-      % indexOfFirst transfer function - returns index of first truthy input
+      % indexOfFirst transfer function - returns index of first true input
       % See +sig/+transfer/indexOfFirst.m for MEX reference
       nilInstance = sig.Nil.instance();
 
@@ -467,7 +467,7 @@ classdef Node < handle
           return
         end
 
-        % MEX L40-44: predicate is truthy — this is the first match
+        % MEX L40-44: predicate is true — this is the first match
         if pred
           this.setWorkingValue(inp);
           valset = true;
@@ -481,7 +481,7 @@ classdef Node < handle
     end
 
     function valset = keepWhen(this)
-      % keepWhen transfer function - passes 'what' value only when 'when' is truthy
+      % keepWhen transfer function - passes 'what' value only when 'when' is true
       % See +sig/+transfer/keepWhen.m for MEX reference
       %
       % this.Inputs(1) is 'what' - the value to gate
@@ -501,7 +501,7 @@ classdef Node < handle
         return
       end
 
-      % MEX L31: gate on 'when' being truthy
+      % MEX L31: gate on 'when' being non-zero
       if when
         % MEX L33-38: get 'what' WORKING value only (no current fallback)
         nWhat = this.Inputs(1);
@@ -544,8 +544,8 @@ classdef Node < handle
       % latch transfer function - arms on first input, releases on second
       % See +sig/+transfer/latch.m for MEX reference
       %
-      % this.Inputs(1) is 'arm' - arms the latch when truthy
-      % this.Inputs(2) is 'release' - releases the latch when truthy
+      % this.Inputs(1) is 'arm' - arms the latch when non-zero
+      % this.Inputs(2) is 'release' - releases the latch when non-zero
       % this.CurrValue holds the armed state (initialised to false by Signal.m)
       %
       % Only reacts to working values (no LATEST_VALUE fallback) — latch
@@ -561,7 +561,7 @@ classdef Node < handle
       % MEX L10: current armed state from this node's own CurrValue
       armed = this.CurrValue;
 
-      % MEX L12-13: input must be set AND truthy (posting 0 is ignored)
+      % MEX L12-13: input must be set AND non-zero (posting 0 is ignored)
       tryArm = armSet && armWV;
       tryRelease = releaseSet && releaseWV;
 
