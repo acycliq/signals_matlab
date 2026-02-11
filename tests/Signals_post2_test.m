@@ -1014,5 +1014,129 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       testCase.verifyEqual(result(end).value, [1 2 3], ...
         'Log should handle array values');
     end
+
+    %% scan tests
+    function test_scan_basic_accumulator(testCase)
+      % Basic scan: accumulate sum with seed = 0
+      net = testCase.net;
+      a = net.origin('a');
+      acc = a.scan(@plus, 0);
+
+      a.post2(5);
+      testCase.verifyEqual(acc.Node.CurrValue, 5, ...
+        'Accumulator should be 0 + 5 = 5');
+
+      a.post2(3);
+      testCase.verifyEqual(acc.Node.CurrValue, 8, ...
+        'Accumulator should be 5 + 3 = 8');
+
+      a.post2(2);
+      testCase.verifyEqual(acc.Node.CurrValue, 10, ...
+        'Accumulator should be 8 + 2 = 10');
+    end
+
+    function test_scan_seed_initialises_accumulator(testCase)
+      % Seed value should be the starting accumulator
+      net = testCase.net;
+      a = net.origin('a');
+      acc = a.scan(@plus, 100);
+
+      a.post2(1);
+      testCase.verifyEqual(acc.Node.CurrValue, 101, ...
+        'Accumulator should start from seed 100');
+    end
+
+    function test_scan_seed_signal_override(testCase)
+      % When seed is a signal, updating it should reset the accumulator
+      net = testCase.net;
+      a = net.origin('a');
+      seed = net.origin('seed');
+      acc = a.scan(@plus, seed);
+
+      seed.post2(10);
+      testCase.verifyEqual(acc.Node.CurrValue, 10, ...
+        'Seed signal should set initial accumulator');
+
+      a.post2(5);
+      testCase.verifyEqual(acc.Node.CurrValue, 15, ...
+        'Accumulator should be 10 + 5 = 15');
+
+      % Posting new seed resets accumulator
+      seed.post2(0);
+      testCase.verifyEqual(acc.Node.CurrValue, 0, ...
+        'New seed should reset accumulator');
+
+      a.post2(7);
+      testCase.verifyEqual(acc.Node.CurrValue, 7, ...
+        'Accumulator should be 0 + 7 = 7 after reset');
+    end
+
+    function test_scan_with_parameters(testCase)
+      % Scan with extra parameter: f(acc, item, par)
+      net = testCase.net;
+      a = net.origin('a');
+      scale = net.origin('scale');
+      % f(acc, item, scale) = acc + item * scale
+      acc = a.scan(@(acc, item, s) acc + item * s, 0, 'pars', scale);
+
+      scale.post2(2);
+      a.post2(5);
+      testCase.verifyEqual(acc.Node.CurrValue, 10, ...
+        'Should be 0 + 5*2 = 10');
+
+      a.post2(3);
+      testCase.verifyEqual(acc.Node.CurrValue, 16, ...
+        'Should be 10 + 3*2 = 16');
+
+      % Change scale parameter
+      scale.post2(10);
+      a.post2(1);
+      testCase.verifyEqual(acc.Node.CurrValue, 26, ...
+        'Should be 16 + 1*10 = 26');
+    end
+
+    function test_scan_no_item_no_update(testCase)
+      % If element input has no working value, accumulator should not change
+      net = testCase.net;
+      a = net.origin('a');
+      acc = a.scan(@plus, 0);
+
+      a.post2(5);
+      testCase.verifyEqual(acc.Node.CurrValue, 5);
+
+      % Don't post to a — calling scan directly should return false
+      result = acc.Node.scan();
+      testCase.verifyFalse(result, ...
+        'scan should return false when element has no working value');
+    end
+
+    function test_scan_missing_parameter_bails(testCase)
+      % If a parameter has no value at all, scan should not proceed
+      net = testCase.net;
+      a = net.origin('a');
+      p = net.origin('p');
+      acc = a.scan(@(acc, item, par) acc + item + par, 0, 'pars', p);
+
+      % Post to a without ever posting to p — param is missing
+      a.post2(5);
+      testCase.verifyEqual(acc.Node.CurrValue, 0, ...
+        'Accumulator should stay at seed when parameter is missing');
+    end
+
+    function test_scan_custom_function(testCase)
+      % Scan with custom function: build a string
+      net = testCase.net;
+      a = net.origin('a');
+      acc = a.scan(@(acc, item) [acc '_' num2str(item)], 'start');
+
+      a.post2(1);
+      testCase.verifyEqual(acc.Node.CurrValue, 'start_1');
+
+      a.post2(2);
+      testCase.verifyEqual(acc.Node.CurrValue, 'start_1_2');
+
+      a.post2(3);
+      testCase.verifyEqual(acc.Node.CurrValue, 'start_1_2_3');
+    end
   end
 end
