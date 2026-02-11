@@ -608,6 +608,78 @@ classdef Node < handle
       end
     end
 
+    function valset = scan(this)
+      % scan transfer function - fold/accumulate over element inputs
+      % See +sig/+transfer/scan.m for MEX reference
+      %
+      % Input layout: [item_1, ..., item_n, seed, par_1, ..., par_m]
+      % this.transArg = funcs (cell array, one function per element input)
+      % this.CurrValue holds the accumulator (initialised from seed by Signal.m)
+      nilInstance = sig.Nil.instance();
+      funcs = this.transArg;
+      inputs = this.Inputs;
+      nElemInps = numel(funcs);
+      nParInps = numel(inputs) - nElemInps - 1;
+
+      % MEX L10-18: seed override — if seed has working value, use it
+      seedNode = inputs(nElemInps + 1);
+      if seedNode.workingValue ~= nilInstance
+        val = seedNode.workingValue;
+        valavail = true;
+        valset = true;
+      else
+        % MEX L17: use this node's own CurrValue as accumulator
+        val = this.CurrValue;
+        valavail = val ~= nilInstance;
+        valset = false;
+      end
+
+      % MEX L21-32: gather parameter inputs (LATEST_VALUE pattern)
+      % If any param is completely missing, bail out immediately
+      pars = cell(1, nParInps);
+      for ii = 1:nParInps
+        parNode = inputs(nElemInps + 1 + ii);
+        if parNode.workingValue ~= nilInstance
+          pars{ii} = parNode.workingValue;
+        elseif parNode.CurrValue ~= nilInstance
+          pars{ii} = parNode.CurrValue;
+        else
+          % MEX L28: bail out — but if seed override set valset=true,
+          % we must still propagate the seed value
+          if valset
+            this.setWorkingValue(val);
+          end
+          return
+        end
+      end
+
+      % MEX L34-55: apply scan functions to element inputs
+      for ii = 1:nElemInps
+        itemWV = inputs(ii).workingValue;
+        if valavail && itemWV ~= nilInstance
+          f = funcs{ii};
+          try
+            val = f(val, itemWV, pars{:});
+            valset = true;
+          catch ex
+            msg = sprintf(['Error in Net %i scanning node %s (id %i) from Nodes [%s]:\n' ...
+              'function call ''%s'' with inputs (%s) produced an error:\n %s'], ...
+              this.Net.Id, this.Name, this.Id, num2str([inputs.Id]), func2str(f), ...
+              strjoin(mapToCell(@(v)toStr(v,1), [{val itemWV}, pars]), ', '), ex.message);
+            sigEx = sig.Exception('transfer:scan:error', ...
+              msg, this.Net.Id, this.Id, [inputs.Id], [{val itemWV}, pars], f);
+            ex = ex.addCause(sigEx);
+            rethrow(ex)
+          end
+        end
+      end
+
+      % MEX: if valset, store the accumulated result
+      if valset
+        this.setWorkingValue(val);
+      end
+    end
+
 
   end
 
