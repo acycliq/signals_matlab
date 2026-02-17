@@ -1228,5 +1228,110 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       testCase.verifyEqual(numel(net.Schedule), 3);
       testCase.verifyEqual(net.Schedule(3).value, 300);
     end
+    %% Missing test coverage from Signals_test.m
+
+    function test_filter_char_expression(testCase)
+      % Original test_filter covers: a.filter('~=2') with char instead of function handle
+      net = testCase.net;
+      a = net.origin('a');
+      f = a.filter('~=2');
+
+      % 0 ~= 2 is true, so value passes through
+      a.post2(0);
+      testCase.verifyEqual(f.Node.CurrValue, 0, ...
+        'filter with char should pass value where expression is true');
+
+      % 2 ~= 2 is false, so value is blocked
+      a.post2(2);
+      testCase.verifyEqual(f.Node.CurrValue, 0, ...
+        'filter with char should block value where expression is false');
+    end
+
+    function test_map_signal_to_signal(testCase)
+      % Original test_map covers: a.map(c) where c is another signal
+      % This means "whenever a updates, take c's current value"
+      net = testCase.net;
+      a = net.origin('a');
+      c = net.origin('c');
+      b = a.map(c);
+
+      % Post to c first — b should not update (a hasn't fired)
+      c.post2(1:3);
+      testCase.verifyTrue(b.Node.CurrValue == sig.Nil.instance(), ...
+        'map(signal) should not update until source signal updates');
+
+      % Post to a — b should take c's current value
+      a.post2(0);
+      testCase.verifyEqual(b.Node.CurrValue, 1:3, ...
+        'map(signal) should take the mapped signal''s value when source updates');
+    end
+
+    function test_bufferUpTo_signal_N(testCase)
+      % Original test_bufferUpTo covers: a.bufferUpTo(b) where b is a signal
+      net = testCase.net;
+      a = net.origin('a');
+      b = net.origin('b');
+      buff = a.bufferUpTo(b);
+
+      % No updates until n samples defined
+      a.post2(1);
+      testCase.verifyTrue(buff.Node.CurrValue == sig.Nil.instance(), ...
+        'bufferUpTo(signal) should not update before N is set');
+
+      % Set N then fill buffer
+      b.post2(3);
+      a.post2(10);
+      a.post2(20);
+      a.post2(30);
+      testCase.verifyEqual(numel(buff.Node.CurrValue), 3, ...
+        'Buffer should have exactly N elements');
+      testCase.verifyEqual(buff.Node.CurrValue(end), 30, ...
+        'Last buffer element should be most recent value');
+
+      % Shrink N — next post should trim buffer
+      b.post2(2);
+      a.post2(40);
+      testCase.verifyEqual(numel(buff.Node.CurrValue), 2, ...
+        'Buffer should shrink when N decreases');
+      testCase.verifyEqual(buff.Node.CurrValue(end), 40, ...
+        'Last buffer element should be most recent after shrink');
+    end
+
+    function test_nop_warning(testCase)
+      % Original test_nop covers: nop issues warning 'signals:transfer:nopCalled'
+      net = testCase.net;
+      a = net.origin('a');
+      % Create a node with nop transfer (default when no transfer specified)
+      nopNode = sig.node.Node(net);
+      testCase.verifyWarning(@() nopNode.nop(), ...
+        'signals:transfer:nopCalled', ...
+        'nop should issue warning matching MEX reference');
+    end
+
+    function test_then(testCase)
+      % Original test_then covers: b.then(a) is reversed-argument at
+      % b.then(a) == a.at(b) — sample a's value when b fires
+      net = testCase.net;
+      a = net.origin('a');
+      b = net.origin('b');
+      s = b.then(a);
+
+      % Post value to a (what) — s should not update
+      v = 42;
+      a.post2(v);
+      testCase.verifyTrue(s.Node.CurrValue == sig.Nil.instance(), ...
+        'then should not update when only what is posted');
+
+      % Post true to b (when) — s should sample a's current value
+      b.post2(true);
+      testCase.verifyEqual(s.Node.CurrValue, v, ...
+        'then should sample what''s value when when fires true');
+
+      % Post new value to a, then false to b — s should not update
+      a.post2(99);
+      b.post2(false);
+      testCase.verifyEqual(s.Node.CurrValue, v, ...
+        'then should not update when when fires false');
+    end
   end
 end
