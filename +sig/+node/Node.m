@@ -608,6 +608,37 @@ classdef Node < handle
       end
     end
 
+    function valset = schedule(this)
+      % schedule transfer function - packages value with delay for delayed posting
+      % See +sig/+transfer/schedule.m for MEX reference
+      %
+      % this.Inputs(1) is 'what' - the value to deliver after delay
+      % this.Inputs(2) is 'delay' - the delay duration
+      % Output is a cell {what, delay} "packet" used by delayedPost
+      nilInstance = sig.Nil.instance();
+
+      % MEX L13-16: get latest 'delay' value — LATEST_VALUE pattern
+      nDelay = this.Inputs(2);
+      if nDelay.workingValue ~= nilInstance
+        delay = nDelay.workingValue;
+      elseif nDelay.CurrValue ~= nilInstance
+        delay = nDelay.CurrValue;
+      else
+        valset = false;
+        return
+      end
+
+      % MEX L18: get 'what' WORKING value only (no current fallback)
+      what = this.Inputs(1).workingValue;
+      if what ~= nilInstance
+        % MEX L21: output schedule packet
+        this.setWorkingValue({what delay});
+        valset = true;
+      else
+        valset = false;
+      end
+    end
+
     function valset = scan(this)
       % scan transfer function - fold/accumulate over element inputs
       % See +sig/+transfer/scan.m for MEX reference
