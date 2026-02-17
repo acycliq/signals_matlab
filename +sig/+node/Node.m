@@ -197,6 +197,7 @@ classdef Node < handle
     function valset = nop(this)
       % NOP Transfer function - performs no operation
       % Always returns false (no value set)
+      warning('signals:transfer:nopCalled', 'sig.transfer.nop called')
       valset = false;
     end
     
