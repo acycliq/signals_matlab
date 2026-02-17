@@ -153,10 +153,15 @@ classdef OriginSignal < sig.node.Signal
         % ready = true (already set above)
     end
     
-    function applyWorkingValues(this, affectedNodes)
+    function applyWorkingValues(~, affectedNodes)
         % Apply all working values to current values
         for i = 1:length(affectedNodes)
-            affectedNodes{i}.commitWorkingValue();
+            node = affectedNodes{i};
+            node.commitWorkingValue();
+            % Notify event target after commit (matches MEX network.c L378-381)
+            if ~isempty(node.EventTarget)
+                node.EventTarget.valueChanged(node.CurrValue);
+            end
         end
     end
   end

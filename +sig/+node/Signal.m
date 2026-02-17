@@ -517,14 +517,14 @@ classdef Signal < sig.Signal & handle
       this.OnValueCallbacks(callbackidx) = fun;
       if length(this.OnValueCallbacks) == 1 % just added to an empty list
         % so we now need to listen to mxnode events
-        setNodeEventTarget(this.Node.NetId, this.Node.Id, this);
+        this.Node.EventTarget = this;
       end
       h = TidyHandle(@unsub);
       function unsub()
         this.OnValueCallbacks.remove(callbackidx);
         if isempty(this.OnValueCallbacks) % list now empty
           % remove us as the event target from the mxnode
-          setNodeEventTarget(this.Node.NetId, this.Node.Id, []);
+          this.Node.EventTarget = [];
         end
       end
     end

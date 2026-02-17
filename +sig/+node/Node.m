@@ -15,6 +15,7 @@ classdef Node < handle
     queued = false       % mex-style queued flag: true if node is currently in processing queue, false otherwise
                          % Its role is to prevents duplicate queuing during signal propagation
     Targets % will keep the input nodes (aka children)
+    EventTarget % Signal to notify on value commit (replaces MEX eventsTarget)
   end
   
   properties (SetAccess = immutable)
