@@ -1138,5 +1138,87 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       a.post2(3);
       testCase.verifyEqual(acc.Node.CurrValue, 'start_1_2_3');
     end
+
+    %% schedule tests
+    function test_schedule_basic(testCase)
+      % When both 'what' and 'delay' are available, output is {what, delay}
+      net = testCase.net;
+      a = net.origin('a');
+      period = net.origin('period');
+      % Create schedule node directly — delay() calls onValue which needs MEX
+      s = a.applyTransferFun(period, 'sig.transfer.schedule', [], '%s.schedule(%s)');
+
+      period.post2(2);
+      a.post2(42);
+      testCase.verifyEqual(s.Node.CurrValue, {42, 2}, ...
+        'Schedule should output {what, delay} packet');
+    end
+
+    function test_schedule_no_what(testCase)
+      % If 'what' has no working value, schedule should not fire
+      net = testCase.net;
+      a = net.origin('a');
+      period = net.origin('period');
+      s = a.applyTransferFun(period, 'sig.transfer.schedule', [], '%s.schedule(%s)');
+      nilInstance = sig.Nil.instance();
+
+      % Only post to delay, not to 'what'
+      period.post2(5);
+      testCase.verifyTrue(s.Node.CurrValue == nilInstance, ...
+        'Schedule should not fire without what working value');
+    end
+
+    function test_schedule_no_delay(testCase)
+      % If 'delay' has no value at all, schedule should not fire
+      net = testCase.net;
+      a = net.origin('a');
+      period = net.origin('period');
+      s = a.applyTransferFun(period, 'sig.transfer.schedule', [], '%s.schedule(%s)');
+      nilInstance = sig.Nil.instance();
+
+      % Only post to 'what', delay never set
+      a.post2(42);
+      testCase.verifyTrue(s.Node.CurrValue == nilInstance, ...
+        'Schedule should not fire without delay value');
+    end
+
+    function test_schedule_delay_uses_latest_value(testCase)
+      % 'delay' uses LATEST_VALUE — falls back to current when no working
+      net = testCase.net;
+      a = net.origin('a');
+      period = net.origin('period');
+      s = a.applyTransferFun(period, 'sig.transfer.schedule', [], '%s.schedule(%s)');
+
+      % Set delay first (becomes currValue), then post 'what' alone
+      period.post2(3);
+      a.post2(10);
+      testCase.verifyEqual(s.Node.CurrValue, {10, 3}, ...
+        'Schedule should use delay current value as fallback');
+
+      % Post 'what' again — delay still has current value from before
+      a.post2(20);
+      testCase.verifyEqual(s.Node.CurrValue, {20, 3}, ...
+        'Schedule should keep using delay current value');
+    end
+
+    function test_schedule_multiple_posts(testCase)
+      % Each new 'what' post produces a fresh packet
+      net = testCase.net;
+      a = net.origin('a');
+      period = net.origin('period');
+      s = a.applyTransferFun(period, 'sig.transfer.schedule', [], '%s.schedule(%s)');
+
+      period.post2(1);
+      a.post2(100);
+      testCase.verifyEqual(s.Node.CurrValue, {100, 1});
+
+      a.post2(200);
+      testCase.verifyEqual(s.Node.CurrValue, {200, 1});
+
+      % Change delay too
+      period.post2(5);
+      a.post2(300);
+      testCase.verifyEqual(s.Node.CurrValue, {300, 5});
+    end
   end
 end
