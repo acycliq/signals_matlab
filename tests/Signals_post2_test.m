@@ -15,10 +15,6 @@ classdef Signals_post2_test < matlab.unittest.TestCase
     function createNetwork(testCase)
       testCase.net = sig.Net;
       testCase.addTeardown(@delete, testCase.net)
-      % Add mocks path for GetSecs fallback (tries real MEX first, see tests/mocks/GetSecs.m)
-      mockPath = fullfile(fileparts(mfilename('fullpath')), 'mocks');
-      addpath(mockPath);
-      testCase.addTeardown(@() rmpath(mockPath));
     end
   end
 
