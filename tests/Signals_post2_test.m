@@ -1329,5 +1329,106 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       testCase.verifyEqual(s.Node.CurrValue, v, ...
         'then should not update when when fires false');
     end
+
+    %% flatten Tests
+    function test_flatten_regular_value(testCase)
+      % Director posts a regular value — flatten gets that value
+      a = testCase.A;
+      flat = a.flatten();
+
+      a.post2(42);
+      testCase.verifyEqual(flat.Node.CurrValue, 42, ...
+        'flatten should pass through regular values');
+    end
+
+    function test_flatten_signal_value(testCase)
+      % Director posts a Signal — flatten gets that Signal's current value
+      a = testCase.A;
+      b = testCase.B;
+      flat = a.flatten();
+
+      % Give b a value first, then point director at b
+      b.post2(10);
+      a.post2(b);
+      testCase.verifyEqual(flat.Node.CurrValue, 10, ...
+        'flatten should get source Signal''s value');
+    end
+
+    function test_flatten_source_updates(testCase)
+      % Source Signal updates — flatten follows
+      a = testCase.A;
+      b = testCase.B;
+      flat = a.flatten();
+
+      b.post2(10);
+      a.post2(b);
+      testCase.verifyEqual(flat.Node.CurrValue, 10);
+
+      % Now update source — flatten should follow
+      b.post2(99);
+      testCase.verifyEqual(flat.Node.CurrValue, 99, ...
+        'flatten should follow source updates');
+    end
+
+    function test_flatten_switch_source(testCase)
+      % Director switches from Signal A to Signal B — flatten follows B
+      a = testCase.A;
+      b = testCase.B;
+      c = testCase.C;
+      flat = a.flatten();
+
+      % Point at b
+      b.post2(10);
+      a.post2(b);
+      testCase.verifyEqual(flat.Node.CurrValue, 10);
+
+      % Switch to c
+      c.post2(20);
+      a.post2(c);
+      testCase.verifyEqual(flat.Node.CurrValue, 20, ...
+        'flatten should follow new source after switch');
+
+      % Update c — flatten should follow c, not b
+      c.post2(30);
+      testCase.verifyEqual(flat.Node.CurrValue, 30, ...
+        'flatten should follow new source updates');
+    end
+
+    function test_flatten_signal_to_regular(testCase)
+      % Director switches from Signal to regular value
+      a = testCase.A;
+      b = testCase.B;
+      flat = a.flatten();
+
+      % Start with signal
+      b.post2(10);
+      a.post2(b);
+      testCase.verifyEqual(flat.Node.CurrValue, 10);
+
+      % Switch to regular value
+      a.post2(42);
+      testCase.verifyEqual(flat.Node.CurrValue, 42, ...
+        'flatten should return regular value after switching from Signal');
+    end
+
+    function test_flatten_via_signal_api(testCase)
+      % Test through Signal-level flatten() API
+      a = testCase.A;
+      b = testCase.B;
+      flat = a.flatten();
+
+      % Verify it creates a valid signal
+      testCase.verifyTrue(isa(flat, 'sig.node.Signal'), ...
+        'flatten() should return a Signal');
+
+      % Regular value
+      a.post2(5);
+      testCase.verifyEqual(flat.Node.CurrValue, 5);
+
+      % Signal value
+      b.post2(100);
+      a.post2(b);
+      testCase.verifyEqual(flat.Node.CurrValue, 100);
+    end
   end
 end

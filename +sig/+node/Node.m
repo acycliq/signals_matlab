@@ -20,7 +20,10 @@ classdef Node < handle
   
   properties (SetAccess = immutable)
     Net sig.Net % Parent network
-    Inputs sig.node.Node % Array of input nodes
+  end
+
+  properties (SetAccess = private)
+    Inputs sig.node.Node % Array of input nodes (private so only setInputs can rewire)
   end
   
   properties (SetAccess = private, Transient)
@@ -124,7 +127,67 @@ classdef Node < handle
       end
     end
     
-    function setInputs(this, nodes)
+    function setInputs(this, newInputs)
+      % MATLAB equivalent of MEX nodeInputs() — rewires this node's inputs
+      % and updates Targets arrays for propagation. Used by flatten to
+      % dynamically add/remove source connections.
+      %
+      % Fix #1: no-op early exit when inputs are unchanged.
+      % Fix #3: diff-based — only inputs that move in/out are touched. Stable
+      % inputs (e.g. flatten's director) keep their Targets entry untouched.
+      oldInputs = this.Inputs;
+      nOld = numel(oldInputs);
+      nNew = numel(newInputs);
+
+      if nOld == nNew
+        same = true;
+        for i = 1:nOld
+          if oldInputs(i) ~= newInputs(i)
+            same = false;
+            break
+          end
+        end
+        if same
+          return
+        end
+      end
+
+      % Remove this node from old inputs that are not in newInputs.
+      for i = 1:nOld
+        inp = oldInputs(i);
+        keep = false;
+        for j = 1:nNew
+          if inp == newInputs(j)
+            keep = true;
+            break
+          end
+        end
+        if ~keep
+          for k = numel(inp.Targets):-1:1
+            if inp.Targets{k} == this
+              inp.Targets(k) = [];
+              break
+            end
+          end
+        end
+      end
+
+      this.Inputs = newInputs;
+
+      % Add this node to new inputs that were not in oldInputs.
+      for i = 1:nNew
+        inp = newInputs(i);
+        isNew = true;
+        for j = 1:nOld
+          if inp == oldInputs(j)
+            isNew = false;
+            break
+          end
+        end
+        if isNew
+          inp.Targets{end+1} = this;
+        end
+      end
     end
     
     function setCurrValue(this, value)
@@ -731,6 +794,79 @@ classdef Node < handle
       % MEX: if valset, store the accumulated result
       if valset
         this.setWorkingValue(val);
+      end
+    end
+
+    function valset = flatten(this)
+      % flatten transfer function - unwraps nested signals
+      % See +sig/+transfer/flatten.m for MEX reference
+      %
+      % this.Inputs(1) is the 'director' — the signal whose value might be another signal
+      % this.Inputs(2) is the 'source' — dynamically wired to whatever signal the director holds
+      % this.transArg is a StructRef with 'unappliedInputChanges' flag (persists across calls)
+      nilInstance = sig.Nil.instance();
+      state = this.transArg;
+      director = this.Inputs(1);
+      valset = false; % MEX L30: default to false
+
+      %%% MEX L33-42: Check director's working value
+      dirWorking = director.workingValue;
+      if dirWorking ~= nilInstance
+        state.unappliedInputChanges = true;
+        valset = true;
+        if isa(dirWorking, 'sig.node.Signal')
+          % Director value is a Signal — rewire source connection
+          sourceNode = dirWorking.Node;
+          this.setInputs([director, sourceNode]);
+          % Don't return yet — check source below
+        else
+          % Director value is regular — return it directly
+          this.setInputs(director); % remove source if any
+          this.setWorkingValue(dirWorking);
+          return
+        end
+
+      %%% MEX L43-58: No director working value, handle unappliedInputChanges.
+      % Fix #2: skip setInputs in this branch — wiring already reflects the
+      % rewire from the previous transaction (this.Inputs persists across
+      % calls, unlike MEX's local 'inputs' variable that resets each call).
+      else
+        if state.unappliedInputChanges
+          state.unappliedInputChanges = false;
+          dirCurr = director.CurrValue;
+          if dirCurr ~= nilInstance
+            if isa(dirCurr, 'sig.node.Signal')
+              % Inputs already == [director, sourceNode] from previous call —
+              % nothing to rewire, fall through to consume source below.
+            else
+              % Inputs already == [director] from previous call.
+              valset = false;
+              return
+            end
+          else
+            % Director currValue cleared somehow (shouldn't happen in normal
+            % use). Inputs already trimmed last time, nothing to do.
+            valset = false;
+            return
+          end
+        end
+      end
+
+      %%% MEX L61-74: Check source, if any
+      if numel(this.Inputs) > 1
+        source = this.Inputs(2);
+        if source.workingValue ~= nilInstance
+          this.setWorkingValue(source.workingValue);
+          valset = true;
+        elseif valset
+          % New source connection was made earlier, take source's current value
+          if source.CurrValue ~= nilInstance
+            this.setWorkingValue(source.CurrValue);
+            % valset stays true
+          else
+            valset = false;
+          end
+        end
       end
     end
 
