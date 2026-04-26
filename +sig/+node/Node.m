@@ -804,14 +804,17 @@ classdef Node < handle
       % this.Inputs(1) is the 'director' — the signal whose value might be another signal
       % this.Inputs(2) is the 'source' — dynamically wired to whatever signal the director holds
       % this.transArg is a StructRef with 'unappliedInputChanges' flag (persists across calls)
-      nilInstance = sig.Nil.instance();
+      %
+      % Note: we use isa(x, 'sig.Nil') instead of x == nilInstance because
+      % the value being held may itself be a Signal, and Signal overloads
+      % == / ~= to build a new comparison Signal rather than return a bool.
       state = this.transArg;
       director = this.Inputs(1);
       valset = false; % MEX L30: default to false
 
       %%% MEX L33-42: Check director's working value
       dirWorking = director.workingValue;
-      if dirWorking ~= nilInstance
+      if ~isa(dirWorking, 'sig.Nil')
         state.unappliedInputChanges = true;
         valset = true;
         if isa(dirWorking, 'sig.node.Signal')
@@ -834,7 +837,7 @@ classdef Node < handle
         if state.unappliedInputChanges
           state.unappliedInputChanges = false;
           dirCurr = director.CurrValue;
-          if dirCurr ~= nilInstance
+          if ~isa(dirCurr, 'sig.Nil')
             if isa(dirCurr, 'sig.node.Signal')
               % Inputs already == [director, sourceNode] from previous call —
               % nothing to rewire, fall through to consume source below.
@@ -855,13 +858,15 @@ classdef Node < handle
       %%% MEX L61-74: Check source, if any
       if numel(this.Inputs) > 1
         source = this.Inputs(2);
-        if source.workingValue ~= nilInstance
-          this.setWorkingValue(source.workingValue);
+        sourceWV = source.workingValue;
+        if ~isa(sourceWV, 'sig.Nil')
+          this.setWorkingValue(sourceWV);
           valset = true;
         elseif valset
           % New source connection was made earlier, take source's current value
-          if source.CurrValue ~= nilInstance
-            this.setWorkingValue(source.CurrValue);
+          sourceCV = source.CurrValue;
+          if ~isa(sourceCV, 'sig.Nil')
+            this.setWorkingValue(sourceCV);
             % valset stays true
           else
             valset = false;
