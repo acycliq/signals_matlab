@@ -188,9 +188,15 @@ classdef Node < handle
         this.setWorkingValue(out{end});  % Store in working value (phase 1)
         valset = true;
       catch ex
-        msg = sprintf('Error in mapn for node %s: %s', this.Name, ex.message);
-        warning(msg);
-        valset = false;
+        inputIds = [this.Inputs.Id];
+        msg = sprintf(['Error in Net %i mapping Nodes [%s] to %i:\n' ...
+          'function call ''%s'' with inputs (%s) produced an error:\n %s'], ...
+          this.Net.Id, num2str(inputIds), this.Id, func2str(f), ...
+          strjoin(mapToCell(@(v)toStr(v,1), inpvals), ', '), ex.message);
+        sigEx = sig.Exception('transfer:mapn:error', ...
+          msg, this.Net.Id, this.Id, inputIds, inpvals, f);
+        ex = ex.addCause(sigEx);
+        rethrow(ex)
       end
     end
     
@@ -235,13 +241,20 @@ classdef Node < handle
 
       % Only compute if input has a working value (new value)
       if input.workingValue ~= nilInstance
+        wv = input.workingValue;
         try
-          val = f(input.workingValue);
+          val = f(wv);
           this.setWorkingValue(val);
           valset = true;
         catch ex
-          warning('Error in map for node %s: %s', this.Name, ex.message);
-          valset = false;
+          inputId = input.Id;
+          msg = sprintf(['Error in Net %i mapping Node %i to %i:\n' ...
+            'function call ''%s'' with input %s produced an error:\n %s'], ...
+            this.Net.Id, inputId, this.Id, func2str(f), toStr(wv, 1), ex.message);
+          sigEx = sig.Exception('transfer:map:error', ...
+            msg, this.Net.Id, this.Id, inputId, wv, f);
+          ex = ex.addCause(sigEx);
+          rethrow(ex)
         end
       else
         valset = false;
@@ -302,15 +315,23 @@ classdef Node < handle
       % Only proceed if node n has a working value
       n = this.Inputs(1);
       if n.workingValue ~= nilInstance
+        what = n.workingValue;
         try
-          indicator = f(n.workingValue);
+          indicator = f(what);
           if indicator == condition
-            this.setWorkingValue(n.workingValue);
+            this.setWorkingValue(what);
             valset = true;
             return
           end
         catch ex
-          warning('Error in filter for node %s: %s', this.Name, ex.message);
+          inputIds = [this.Inputs.Id];
+          msg = sprintf(['Error in Net %i mapping Nodes [%s] to %i:\n' ...
+            'Calling %s on %s produced an error:\n %s'], ...
+            this.Net.Id, num2str(inputIds), this.Id, toStr(f), toStr(what, 1), ex.message);
+          sigEx = sig.Exception('transfer:filter:error', ...
+            msg, this.Net.Id, this.Id, inputIds, {what, condition}, f);
+          ex = ex.addCause(sigEx);
+          rethrow(ex)
         end
       end
 
