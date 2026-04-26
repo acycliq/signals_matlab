@@ -201,12 +201,13 @@ classdef Node < handle
     end
     
     function commitWorkingValue(this)
-        % Copy working value to current value and clear (like MEX)
-        nilInstance = sig.Nil.instance();  % save it so I don't call the function twice
-        if this.workingValue ~= nilInstance
+        % Copy working value to current value and clear (like MEX).
+        % Use isa(x, 'sig.Nil') instead of ~= nilInstance because the
+        % working value may itself be a Signal (e.g. flatten's director),
+        % and Signal overloads ~= to build a new comparison signal.
+        if ~isa(this.workingValue, 'sig.Nil')
             this.setCurrValue(this.workingValue);
-            % Clear working value after application (like MEX does)
-            this.workingValue = nilInstance;
+            this.workingValue = sig.Nil.instance();
         end
     end
     
