@@ -1561,5 +1561,125 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       testCase.verifyFalse(result, ...
         'selectFrom should return false when no input has working value');
     end
+
+    %% subsref Tests
+    function test_subsref_constant_index(testCase)
+      % arr(1) with a literal index, should give first element
+      a = testCase.A;
+      s = a(1);
+
+      a.post2([10 20 30]);
+
+      testCase.verifyEqual(s.Node.CurrValue, 10, ...
+        'a(1) should give first element');
+    end
+
+    function test_subsref_signal_index(testCase)
+      % arr(idx) where idx is itself a signal, both must have values
+      [a, b] = deal(testCase.A, testCase.B);
+      s = a(b);
+
+      a.post2([10 20 30]);
+      b.post2(2);
+
+      testCase.verifyEqual(s.Node.CurrValue, 20, ...
+        'a(2) should give second element');
+    end
+
+    function test_subsref_index_changes(testCase)
+      % change the index, output should switch
+      [a, b] = deal(testCase.A, testCase.B);
+      s = a(b);
+
+      a.post2([10 20 30]);
+      b.post2(1);
+      testCase.verifyEqual(s.Node.CurrValue, 10);
+
+      b.post2(3);
+      testCase.verifyEqual(s.Node.CurrValue, 30, ...
+        'changing index should give new element');
+    end
+
+    function test_subsref_array_changes(testCase)
+      % change the array, output should update with same index
+      [a, b] = deal(testCase.A, testCase.B);
+      s = a(b);
+
+      a.post2([10 20 30]);
+      b.post2(2);
+      testCase.verifyEqual(s.Node.CurrValue, 20);
+
+      a.post2([100 200 300]);
+      testCase.verifyEqual(s.Node.CurrValue, 200, ...
+        'changing array should give new element at same index');
+    end
+
+    function test_subsref_multi_dim(testCase)
+      % a(b, c) with 2D matrix and two index signals
+      [a, b, c] = deal(testCase.A, testCase.B, testCase.C);
+      s = a(b, c);
+
+      a.post2([1 2 3; 4 5 6; 7 8 9]);
+      b.post2(2);
+      c.post2(3);
+
+      testCase.verifyEqual(s.Node.CurrValue, 6, ...
+        'a(2,3) should give the element at row 2, col 3');
+    end
+
+    function test_subsref_slice(testCase)
+      % a(2:4), slicing with a colon expression
+      a = testCase.A;
+      s = a(2:4);
+
+      a.post2([10 20 30 40 50]);
+
+      testCase.verifyEqual(s.Node.CurrValue, [20 30 40], ...
+        'a(2:4) should give a slice');
+    end
+
+    function test_subsref_end_keyword(testCase)
+      % a(end), checks the deferred end keyword works. Signal.end(k,n)
+      % builds an expr.End object instead of a number, and the transfer
+      % function calls resolve() on it (MEX L46-50)
+      a = testCase.A;
+      s = a(end);
+
+      a.post2([10 20 30 40]);
+
+      testCase.verifyEqual(s.Node.CurrValue, 40, ...
+        'a(end) should give the last element');
+    end
+
+    function test_subsref_unset_subscript(testCase)
+      % if a subscript signal has no value, can't compute anything
+      [a, b] = deal(testCase.A, testCase.B);
+      s = a(b);
+
+      a.post2([10 20 30]);
+      % b never posted
+
+      testCase.verifyTrue(s.Node.CurrValue == sig.Nil.instance(), ...
+        'should not emit when subscript has no value');
+    end
+
+    function test_subsref_no_working_value(testCase)
+      % direct call after a successful propagation. all inputs have
+      % CurrValues but none have workingValues, so ~any(wvset) bails
+      % out with valset=false. MEX literally falls off the end of the
+      % function here without setting val/valset, our version returns
+      % false explicitly. the method is named subsrefTransfer on Node
+      % so it doesn't collide with MATLAB's builtin subsref
+      [a, b] = deal(testCase.A, testCase.B);
+      s = a(b);
+
+      a.post2([10 20 30]);
+      b.post2(2);
+      testCase.verifyEqual(s.Node.CurrValue, 20);
+
+      result = s.Node.subsrefTransfer();
+      testCase.verifyFalse(result, ...
+        'subsrefTransfer should return false when no input has working value');
+    end
   end
 end
