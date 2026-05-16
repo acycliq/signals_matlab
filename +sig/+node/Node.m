@@ -71,6 +71,12 @@ classdef Node < handle
       C = strsplit(transFun, '.');  % for example strip-split: 'sig.transfer.mapn'
       if length(C) >= 3 && strcmp(C{1}, 'sig') && strcmp(C{2}, 'transfer')
         mstr = C{end}; % e.g. 'mapn'
+        % 'subsref' as a method name on a handle class would override MATLAB's
+        % builtin dot/index dispatch and brick all property access on Node.
+        % use a renamed method instead.
+        if strcmp(mstr, 'subsref')
+          mstr = 'subsrefTransfer';
+        end
         try
           % Check if method exists on this object (maybe I should remove the check if it is costly, need to time it, but shouldnt add too much...)
           if ismethod(this, mstr)
@@ -930,6 +936,86 @@ classdef Node < handle
 
       % MEX L33-34: nothing to emit
       valset = false;
+    end
+
+    function valset = subsrefTransfer(this)
+      % subsref transfer function - applies indexing to a signal's value.
+      % See +sig/+transfer/subsref.m for the MEX reference.
+      %
+      % Named subsrefTransfer rather than subsref so it doesn't collide
+      % with MATLAB's builtin subsref dispatch on the Node handle class.
+      % The Node constructor maps 'sig.transfer.subsref' to this method name.
+      %
+      % Inputs(1) is the thing being indexed, the parent signal.
+      % Inputs(2..end) are the subscripts (any of which can be a signal,
+      % a literal value, or a deferred expr.Expr like end-1:end).
+      % this.transArg is the subscript type, one of '.', '()' or '{}'.
+      %
+      % In normal use Signal.subsref only routes '()' here, the '.' and '{}'
+      % branches are reachable only by direct invocation.
+      %
+      % We need a value on every input (working or current). We only emit
+      % if at least one of them was just updated this round.
+      type = this.transArg;
+      nilInstance = sig.Nil.instance();
+      nInputs = numel(this.Inputs);
+      inpvals = cell(nInputs, 1);
+      wvset = false(nInputs, 1);
+
+      % MEX L8-25: grab every input's value, working first then current.
+      % bail out as soon as we find an input with no value at all
+      for k = 1:nInputs
+        input = this.Inputs(k);
+        if input.workingValue ~= nilInstance
+          inpvals{k} = input.workingValue;
+          wvset(k) = true;
+        elseif input.CurrValue ~= nilInstance
+          inpvals{k} = input.CurrValue;
+          wvset(k) = false;
+        else
+          valset = false;
+          return
+        end
+      end
+
+      % MEX L27: only emit if at least one input actually changed this round
+      if ~any(wvset)
+        valset = false;
+        return
+      end
+
+      what = inpvals{1};
+
+      % MEX L30-42: '.' field access. If what is a struct and the field
+      % doesn't exist on it, emit nothing
+      if strcmp(type, '.')
+        subs = inpvals{2};
+        if isstruct(what) && ~isfield(what, subs)
+          valset = false;
+          return
+        end
+        this.setWorkingValue(what.(subs));
+        valset = true;
+        return
+      end
+
+      % MEX L43-44: build subscript struct for () or {} access
+      s = struct('type', type, 'subs', {inpvals(2:end)});
+
+      % MEX L46-50: resolve any deferred expr.Expr subscripts.
+      % covers things like arr(end) where end is built as expr.End by
+      % Signal.end(k, n) at parse time
+      for kk = 1:length(s.subs)
+        if isa(s.subs{kk}, 'expr.Expr')
+          s.subs{kk} = resolve(s.subs{kk}, what);
+        end
+      end
+
+      % MEX L53-54: hand off to MATLAB's built-in subsref. using builtin
+      % explicitly rather than plain subsref(what, s) avoids name collision
+      % with this method (Signal.m line 571 does the same)
+      this.setWorkingValue(builtin('subsref', what, s));
+      valset = true;
     end
 
 
