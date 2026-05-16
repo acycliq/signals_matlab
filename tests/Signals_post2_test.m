@@ -1430,5 +1430,136 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       a.post2(b);
       testCase.verifyEqual(flat.Node.CurrValue, 100);
     end
+
+    %% selectFrom Tests
+    function test_selectFrom_basic(testCase)
+      % idx=1 selects option 1
+      [a, b, c] = deal(testCase.A, testCase.B, testCase.C);
+      s = a.selectFrom(b, c);
+
+      b.post2(100);
+      c.post2(200);
+      a.post2(1);
+
+      testCase.verifyEqual(s.Node.CurrValue, 100, ...
+        'idx=1 should select option 1 (b = 100)');
+    end
+
+    function test_selectFrom_picks_second(testCase)
+      % idx=2 selects option 2
+      [a, b, c] = deal(testCase.A, testCase.B, testCase.C);
+      s = a.selectFrom(b, c);
+
+      b.post2(100);
+      c.post2(200);
+      a.post2(2);
+
+      testCase.verifyEqual(s.Node.CurrValue, 200, ...
+        'idx=2 should select option 2 (c = 200)');
+    end
+
+    function test_selectFrom_idx_changes(testCase)
+      % Switching indexer changes which option emits
+      [a, b, c] = deal(testCase.A, testCase.B, testCase.C);
+      s = a.selectFrom(b, c);
+
+      b.post2(100);
+      c.post2(200);
+      a.post2(1);
+      testCase.verifyEqual(s.Node.CurrValue, 100);
+
+      a.post2(2);
+      testCase.verifyEqual(s.Node.CurrValue, 200, ...
+        'switching idx to 2 should emit option 2');
+    end
+
+    function test_selectFrom_option_changes(testCase)
+      % if the selected option gets a new value, that value should come out.
+      % also covers the case where the idx came from the previous round, not
+      % this one
+      [a, b, c] = deal(testCase.A, testCase.B, testCase.C);
+      s = a.selectFrom(b, c);
+
+      b.post2(100);
+      c.post2(200);
+      a.post2(1);
+      testCase.verifyEqual(s.Node.CurrValue, 100);
+
+      b.post2(150);
+      testCase.verifyEqual(s.Node.CurrValue, 150, ...
+        'posting to selected option should emit new value');
+    end
+
+    function test_selectFrom_unselected_option_no_emit(testCase)
+      % posting to an option that isn't currently selected shouldn't change
+      % the output. neither the idx nor the chosen option changed, so we
+      % don't want to re-emit the same value (MEX L26-27)
+      [a, b, c] = deal(testCase.A, testCase.B, testCase.C);
+      s = a.selectFrom(b, c);
+
+      b.post2(100);
+      c.post2(200);
+      a.post2(1);
+      testCase.verifyEqual(s.Node.CurrValue, 100);
+
+      c.post2(999);
+      testCase.verifyEqual(s.Node.CurrValue, 100, ...
+        'posting to unselected option should not change output');
+    end
+
+    function test_selectFrom_idx_out_of_range(testCase)
+      % idx bigger than the number of options, nothing to pick (MEX L21)
+      [a, b, c] = deal(testCase.A, testCase.B, testCase.C);
+      s = a.selectFrom(b, c);
+
+      b.post2(100);
+      c.post2(200);
+      a.post2(5);
+
+      testCase.verifyTrue(s.Node.CurrValue == sig.Nil.instance(), ...
+        'out-of-range idx should not emit');
+    end
+
+    function test_selectFrom_no_idx_value(testCase)
+      % no idx posted yet, so nothing to pick (MEX L15-19)
+      [a, b, c] = deal(testCase.A, testCase.B, testCase.C);
+      s = a.selectFrom(b, c);
+
+      b.post2(100);
+      c.post2(200);
+
+      testCase.verifyTrue(s.Node.CurrValue == sig.Nil.instance(), ...
+        'no indexer value should not emit');
+    end
+
+    function test_selectFrom_selected_option_unset(testCase)
+      % idx points to an option that has never been given a value, so we
+      % can't emit anything
+      [a, b, c] = deal(testCase.A, testCase.B, testCase.C);
+      s = a.selectFrom(b, c);
+
+      b.post2(100);
+      a.post2(2);
+
+      testCase.verifyTrue(s.Node.CurrValue == sig.Nil.instance(), ...
+        'idx pointing to unset option should not emit');
+    end
+
+    function test_selectFrom_no_working_value(testCase)
+      % calling selectFrom directly when nothing has a working value should
+      % just return false (MEX L33-34). you can't actually hit this through
+      % post2() but it matches the pattern of the other no-working-value tests
+      [a, b, c] = deal(testCase.A, testCase.B, testCase.C);
+      s = a.selectFrom(b, c);
+
+      b.post2(100);
+      c.post2(200);
+      a.post2(1);
+      testCase.verifyEqual(s.Node.CurrValue, 100);
+
+      result = s.Node.selectFrom();
+      testCase.verifyFalse(result, ...
+        'selectFrom should return false when no input has working value');
+    end
   end
 end
