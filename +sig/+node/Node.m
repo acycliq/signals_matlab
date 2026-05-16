@@ -876,6 +876,62 @@ classdef Node < handle
       end
     end
 
+    function valset = selectFrom(this)
+      % selectFrom picks one of N options based on an index value.
+      % See +sig/+transfer/selectFrom.m for the MEX reference.
+      %
+      % Inputs(1) is the indexer, a numeric signal saying which option to pick.
+      % Inputs(2..end) are the options themselves.
+      %
+      % Tricky bit: only emit when the indexer or the chosen option actually
+      % just changed. Without that check, the same pair would get re-emitted
+      % every time the node was visited even when nothing relevant changed.
+      nilInstance = sig.Nil.instance();
+      nOptions = numel(this.Inputs) - 1;
+
+      % MEX L9-12: grab the latest indexer value, working first then current
+      indexer = this.Inputs(1);
+      if indexer.workingValue ~= nilInstance
+        idx = indexer.workingValue;
+        idxwvset = true;
+      elseif indexer.CurrValue ~= nilInstance
+        idx = indexer.CurrValue;
+        idxwvset = false;
+      else
+        % MEX L15-19: no indexer value at all, can't pick anything
+        valset = false;
+        return
+      end
+
+      % MEX L21-32: if idx is in range, try to get the option's value
+      if idx <= nOptions
+        option = this.Inputs(idx + 1);
+        if option.workingValue ~= nilInstance
+          selval = option.workingValue;
+          selwvvalset = true;
+          selcvvalset = false;
+        elseif option.CurrValue ~= nilInstance
+          selval = option.CurrValue;
+          selwvvalset = false;
+          selcvvalset = true;
+        else
+          selwvvalset = false;
+          selcvvalset = false;
+        end
+
+        % MEX L26-31: only emit if we have a value AND either the idx or
+        % the option changed this round
+        if (selwvvalset || selcvvalset) && (idxwvset || selwvvalset)
+          this.setWorkingValue(selval);
+          valset = true;
+          return
+        end
+      end
+
+      % MEX L33-34: nothing to emit
+      valset = false;
+    end
+
 
   end
 
