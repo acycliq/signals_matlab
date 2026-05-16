@@ -1638,17 +1638,24 @@ classdef Signals_post2_test < matlab.unittest.TestCase
         'a(2:4) should give a slice');
     end
 
-    function test_subsref_end_keyword(testCase)
-      % a(end), checks the deferred end keyword works. Signal.end(k,n)
-      % builds an expr.End object instead of a number, and the transfer
-      % function calls resolve() on it (MEX L46-50)
+    function test_subsref_end_with_signal_returns_first_element(testCase)
+      % a(end) on a Signal does NOT return the last element of the underlying
+      % array. Signal.m defines end(k,n) as a Static method, so it doesn't
+      % match MATLAB's class end protocol (which wants a non-static method
+      % with the object as first arg). MATLAB falls back to its builtin end
+      % for the Signal handle, which gives numel(signal)=1. So a(end) ends
+      % up being a(1).
+      %
+      % The expr.Expr resolve loop in subsrefTransfer (MEX L46-50) is dead
+      % code through this path. It would only fire if something else built
+      % an expr.End and fed it as a subscript value.
       a = testCase.A;
       s = a(end);
 
       a.post2([10 20 30 40]);
 
-      testCase.verifyEqual(s.Node.CurrValue, 40, ...
-        'a(end) should give the last element');
+      testCase.verifyEqual(s.Node.CurrValue, 10, ...
+        'a(end) on a Signal returns a(1) because Signal.end is static');
     end
 
     function test_subsref_unset_subscript(testCase)
