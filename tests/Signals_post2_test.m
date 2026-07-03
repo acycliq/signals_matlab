@@ -501,6 +501,34 @@ classdef Signals_post2_test < matlab.unittest.TestCase
         'Diamond dependency update failed');
     end
 
+    function test_working_value_retraction(testCase)
+      % A node computed early in a transaction must have its working value
+      % retracted when a later visit in the same transaction produces no
+      % output (MEX network.c L701-708: valset false with a working value
+      % already set clears the value and still propagates).
+      %
+      %   a ----------> c = a.keepWhen(b)
+      %    \           /
+      %     g = a*2 -> b = g > 0
+      %
+      % a's targets are [g, c] in creation order, so c computes first with
+      % b's stale current value, then again after b updates. On the second
+      % visit the gate is closed, so the value gated through on the first
+      % visit must not survive to the commit.
+      a = testCase.A;
+      g = a * 2;
+      b = g > 0;
+      c = a.keepWhen(b);
+
+      a.post2(1);   % gate open, c takes 1
+      testCase.verifyEqual(c.Node.CurrValue, 1, ...
+        'keepWhen should pass value when gate is open');
+
+      a.post2(-5);  % gate closes mid-transaction, first visit gated -5 through
+      testCase.verifyEqual(c.Node.CurrValue, 1, ...
+        'Retracted working value must not be committed');
+    end
+
     %% buffer Tests
     function test_buffer_basic(testCase)
       % Test buffer accumulates values into an array
