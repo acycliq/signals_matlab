@@ -29,14 +29,11 @@ n = numel(inputs);
 inpvals = cell(n, 1);
 wvset = false(n, 1);
 for inp = 1:n
-    node = net.nodes{inputs(inp)};
-    [wv, wvset(inp)] = node.workingNodeValue;
+  [wv, wvset(inp)] = workingNodeValue(net, inputs(inp));
   if wvset(inp) % value follows working value first
     inpvals{inp} = wv;
   else % cvset % falls back to current value
-     cv = node.currNodeValue; 
-     cvset = true; % CAUTION!!! HARDCODED THIS TO TRUE!!!! THIS IS A TEMP SOLUTION
-%     [cv, cvset] = node.currNodeValue;
+    [cv, cvset] = currNodeValue(net, inputs(inp));
     if cvset
       inpvals{inp} = cv;
     else % finding an input with no value set -> no output
