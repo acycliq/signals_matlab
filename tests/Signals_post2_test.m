@@ -346,15 +346,21 @@ classdef Signals_post2_test < matlab.unittest.TestCase
         'at should not fire if what has no value');
     end
 
-    function test_at_nonscalar_when_errors(testCase)
-      % Test at throws error when 'when' is a non-scalar array
-      % The 'when' trigger must be scalar - arrays don't make sense here
+    function test_at_nonscalar_when(testCase)
+      % 'when' goes through a plain if, exactly like MEX at.m L11: a
+      % non-scalar gate passes only when all elements are non-zero
       [pos, click] = deal(testCase.A, testCase.B);
       clickedPos = pos.at(click);
 
       pos.post2(42);
-      testCase.verifyError(@() click.post2([1 1 1]), ...
-        'signals:at:nonScalarWhen');
+      click.post2([1 1 1]);  % all non-zero, gate open
+      testCase.verifyEqual(clickedPos.Node.CurrValue, 42, ...
+        'at should fire when all gate elements are non-zero');
+
+      pos.post2(50);
+      click.post2([1 0 1]);  % contains a zero, gate closed
+      testCase.verifyEqual(clickedPos.Node.CurrValue, 42, ...
+        'at should not fire when any gate element is zero');
     end
 
     %% identity Tests

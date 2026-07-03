@@ -425,13 +425,9 @@ classdef Node < handle
 
       % whenset in MEX tells us if working value exists, we check ~= Nil instead
       if whenWorking ~= nilInstance
-        % 'when' must be scalar (true/false/0/1). Non-scalar triggers
-        % don't make sense for at().
-        if ~isscalar(whenWorking)
-          error('signals:at:nonScalarWhen', ...
-            'at: ''when'' must be scalar, got [%s]', num2str(size(whenWorking)));
-        end
-        if whenWorking  % when is non-zero
+        % MEX L11: plain if, so a non-scalar 'when' gates on all of its
+        % elements being non-zero, and empty gates closed
+        if whenWorking
           % Now get 'what' value - try working first, fall back to current
           % MEX does: [what, whatset] = workingNodeValue(...) then currNodeValue(...)
           nWhat = this.Inputs(1);
