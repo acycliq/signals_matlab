@@ -277,6 +277,17 @@ classdef Signals_post2_test < matlab.unittest.TestCase
         'filter should return false when input has no working value');
     end
 
+    function test_filter_criterion_never_set_errors(testCase)
+      % MEX filter.m L31-33 returns without assigning its outputs when the
+      % criterion has no value at all, so the whole post errors. We crash
+      % the same way by leaving valset unassigned in that branch.
+      [a, crit] = deal(testCase.A, testCase.B);
+      f = a.filter(@ischar, crit);  % criterion signal never posted
+
+      testCase.verifyError(@() a.post2('hello'), ...
+        'MATLAB:unassignedOutputs');
+    end
+
     %% at Tests
     function test_at_basic(testCase)
       % Test basic at: sample 'what' when 'when' fires

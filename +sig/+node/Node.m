@@ -378,7 +378,9 @@ classdef Node < handle
       elseif nCondition.CurrValue ~= nilInstance
         condition = nCondition.CurrValue;
       else
-        valset = false;
+        % MEX L31-33: filter.m returns here without assigning its outputs,
+        % so the whole post errors with unassigned output arguments.
+        % valset is left unassigned on purpose to crash the same way.
         return
       end
 
