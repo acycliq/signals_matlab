@@ -529,6 +529,42 @@ classdef Signals_post2_test < matlab.unittest.TestCase
         'Retracted working value must not be committed');
     end
 
+    function test_event_target_fires_once_per_commit(testCase)
+      % A node computed twice in one transaction appears twice in the
+      % affected list. The apply phase must notify its event target only
+      % once (MEX network.c L368: nodes whose working value was already
+      % applied and cleared are skipped, including their notification).
+      %
+      %   a ----------> d = a + c2
+      %    \           /
+      %     b = a*2 -> c2 = b + 1
+      %
+      % a's targets are [b, d] in creation order, so d computes once with
+      % c2's stale value and again after c2 updates, landing in the
+      % affected list twice.
+      a = testCase.A;
+      b = a * 2;
+      c2 = b + 1;
+      d = a + c2;
+
+      count = 0;
+      lh = d.onValue(@bump);
+
+      a.post2(1);   % d computes on its second visit only
+      testCase.verifyEqual(d.Node.CurrValue, 4);  % 1 + (2*1 + 1)
+      testCase.verifyEqual(count, 1, ...
+        'onValue should fire once for the first post');
+
+      a.post2(2);   % d computes on both visits, affected twice
+      testCase.verifyEqual(d.Node.CurrValue, 7);  % 2 + (2*2 + 1)
+      testCase.verifyEqual(count, 2, ...
+        'onValue must fire once per commit, not once per affected entry');
+
+      function bump(~)
+        count = count + 1;
+      end
+    end
+
     %% buffer Tests
     function test_buffer_basic(testCase)
       % Test buffer accumulates values into an array
