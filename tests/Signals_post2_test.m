@@ -1644,6 +1644,22 @@ classdef Signals_post2_test < matlab.unittest.TestCase
         'a(1) should give first element');
     end
 
+    function test_subsref_dispatches_to_class(testCase)
+      % Indexing a value that has its own subsref must go through that
+      % class's indexing, same as MEX subsref.m L53. StructRef keeps its
+      % data in an Entries struct and its subsref redirects there, so
+      % ref(1) gives the entries struct, not the StructRef handle.
+      a = testCase.A;
+      s = a(1);
+
+      ref = StructRef;
+      ref.x = 42;
+      a.post2(ref);
+
+      testCase.verifyEqual(s.Node.CurrValue, struct('x', 42), ...
+        'indexing must dispatch to the value''s own subsref');
+    end
+
     function test_subsref_signal_index(testCase)
       % arr(idx) where idx is itself a signal, both must have values
       [a, b] = deal(testCase.A, testCase.B);

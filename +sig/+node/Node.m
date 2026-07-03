@@ -1007,10 +1007,11 @@ classdef Node < handle
         end
       end
 
-      % MEX L53-54: hand off to MATLAB's built-in subsref. using builtin
-      % explicitly rather than plain subsref(what, s) avoids name collision
-      % with this method (Signal.m line 571 does the same)
-      this.setWorkingValue(builtin('subsref', what, s));
+      % MEX L53-54: plain subsref call, exactly as the reference does it.
+      % Dispatches on the class of 'what' so values with their own
+      % indexing keep that behaviour. No collision with this method since
+      % it is not named subsref.
+      this.setWorkingValue(subsref(what, s));
       valset = true;
     end
 
