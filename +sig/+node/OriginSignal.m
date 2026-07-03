@@ -74,6 +74,16 @@ classdef OriginSignal < sig.node.Signal
             % Just call the transfer function, it checks if inputs are ready
             computed = curr.transferMethodHandle();
 
+            % MEX network.c L701-708: the transfer set no output, but this
+            % node was given a working value earlier in this transaction.
+            % Retract it so it is not committed, and still propagate so
+            % downstream nodes recompute without it. isa() rather than ~=
+            % because the working value may itself be a Signal.
+            if ~computed && ~isa(curr.workingValue, 'sig.Nil')
+                curr.workingValue = sig.Nil.instance();
+                computed = true;
+            end
+
             if computed  % If node computed new value
                 affected{end+1} = curr;  % Add to affected list
 
