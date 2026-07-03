@@ -46,27 +46,39 @@ classdef OriginSignal < sig.node.Signal
 
     function post2(this, value)
 
-        % Set working value on origin node
-        this.node.setWorkingValue(value);
+        % Set working value on origin node. Node property, not the node()
+        % method, and a direct property write, both to avoid method call
+        % overhead in this hot path.
+        n = this.Node;
+        n.workingValue = value;
 
-        % Initialize queue and affected list
-        queue = {};      % Processing queue
-        affected = {};   % List of affected nodes
+        % Preallocate queue and affected list like MEX network.c L663-664
+        % (QUEUE_ALLOC/STACK_ALLOC of nNodes). The queue can never exceed
+        % nNodes since the queued flag stops duplicates. The affected list
+        % can (nodes computed twice in one transaction), MATLAB just grows
+        % the cell in that rare case.
+        nNodes = numel(n.Net.nodes);
+        queue = cell(1, nNodes);
+        affected = cell(1, nNodes);
 
         % Queue origin node's targets
-        nTargets = length(this.node.Targets);  % save length so I don't call it multiple times
+        targets = n.Targets;
+        nTargets = length(targets);
+        qTail = 0;
         for i = 1:nTargets
-            target = this.node.Targets{i};
+            target = targets{i};
             if ~target.queued
-                queue{end+1} = target;
+                qTail = qTail + 1;
+                queue{qTail} = target;
                 target.queued = true;
             end
         end
-        affected{end+1} = this.node;  % Add origin to affected list
+        affected{1} = n;  % Add origin to affected list
+        nAffected = 1;
 
         % Use index instead of removing from queue (queue(1)=[] is slow)
         qIdx = 1;
-        while qIdx <= length(queue)
+        while qIdx <= qTail
             curr = queue{qIdx};
             qIdx = qIdx + 1;
             curr.queued = false;
@@ -85,14 +97,17 @@ classdef OriginSignal < sig.node.Signal
             end
 
             if computed  % If node computed new value
-                affected{end+1} = curr;  % Add to affected list
+                nAffected = nAffected + 1;
+                affected{nAffected} = curr;  % Add to affected list
 
                 % Queue all targets
-                nTargets = length(curr.Targets);  % save it so i don't keep calling length (used this trick elsewhere)
+                targets = curr.Targets;
+                nTargets = length(targets);
                 for j = 1:nTargets
-                    target = curr.Targets{j};
+                    target = targets{j};
                     if ~target.queued
-                        queue{end+1} = target;
+                        qTail = qTail + 1;
+                        queue{qTail} = target;
                         target.queued = true;
                     end
                 end
@@ -100,7 +115,7 @@ classdef OriginSignal < sig.node.Signal
         end
 
         % Apply all working values (MEX: sqApply)
-        this.applyWorkingValues(affected);
+        this.applyWorkingValues(affected(1:nAffected));
     end
 
 
@@ -165,6 +180,7 @@ classdef OriginSignal < sig.node.Signal
     
     function applyWorkingValues(~, affectedNodes)
         % Apply all working values to current values
+        nilInstance = sig.Nil.instance();
         for i = 1:length(affectedNodes)
             node = affectedNodes{i};
             % MEX network.c L368: skip nodes with no working value to apply.
@@ -175,7 +191,11 @@ classdef OriginSignal < sig.node.Signal
             if isa(node.workingValue, 'sig.Nil')
                 continue
             end
-            node.commitWorkingValue();
+            % Inline commit (working -> current, then clear), direct
+            % property writes instead of commitWorkingValue to save two
+            % method calls per node in this hot path
+            node.CurrValue = node.workingValue;
+            node.workingValue = nilInstance;
             % Notify event target after commit (matches MEX network.c L378-381)
             if ~isempty(node.EventTarget)
                 node.EventTarget.valueChanged(node.CurrValue);

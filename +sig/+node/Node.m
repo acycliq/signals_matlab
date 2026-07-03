@@ -111,7 +111,7 @@ classdef Node < handle
     end
     
     function tf = get.CurrValueSet(this)
-      tf = this.CurrValue ~= sig.Nil.instance();
+      tf = ~isa(this.CurrValue, 'sig.Nil');
     end
 
     function set.Name(this, v)
@@ -208,9 +208,11 @@ classdef Node < handle
     
     function commitWorkingValue(this)
         % Copy working value to current value and clear (like MEX).
-        % Use isa(x, 'sig.Nil') instead of ~= nilInstance because the
-        % working value may itself be a Signal (e.g. flatten's director),
-        % and Signal overloads ~= to build a new comparison signal.
+        % Use isa(x, 'sig.Nil') rather than comparing against the Nil
+        % instance because the working value may itself be a Signal (e.g.
+        % flatten's director), and Signal overloads ~= to build a new
+        % comparison signal. isa is also much faster than the dispatched
+        % comparison.
         if ~isa(this.workingValue, 'sig.Nil')
             this.setCurrValue(this.workingValue);
             this.workingValue = sig.Nil.instance();
@@ -220,28 +222,31 @@ classdef Node < handle
     function valset = mapn(this)
       % mex rule: Compute if ANY input has working value, use LATEST_VALUE for all inputs (better also to the line of network.c here, I will forget it!)
       [f, outnum] = this.transArg{:}; % Get from node property
-      n = numel(this.Inputs);
+      inputs = this.Inputs;  % cache the property, read once not per loop pass
+      n = numel(inputs);
       inpvals = cell(n, 1);
       hasWorkingValue = false(n, 1);  % Track which inputs have working values
 
-      % grab the Nil instance once instead of calling it over and over
-      nilInstance = sig.Nil.instance();
 
       % mex LATEST_VALUE logic: working value if exists, otherwise current value
       for inp = 1:n
-        node = this.Inputs(inp);
-        if node.workingValue ~= nilInstance
+        node = inputs(inp);
+        wv = node.workingValue;  % read the property once, not twice
+        if ~isa(wv, 'sig.Nil')
           % Input has a working value (new value) - use it
-          inpvals{inp} = node.workingValue;
+          inpvals{inp} = wv;
           hasWorkingValue(inp) = true;
-        elseif node.CurrValue ~= nilInstance
-          % Fall back to current value (MEX LATEST_VALUE behavior)
-          inpvals{inp} = node.CurrValue;
-          hasWorkingValue(inp) = false;  % Constants don't trigger, but provide values
         else
-          % No value at all - can't compute
-          valset = false;
-          return;
+          cv = node.CurrValue;
+          if ~isa(cv, 'sig.Nil')
+            % Fall back to current value (MEX LATEST_VALUE behavior).
+            % Constants don't trigger, but provide values.
+            inpvals{inp} = cv;
+          else
+            % No value at all - can't compute
+            valset = false;
+            return;
+          end
         end
       end
 
@@ -255,7 +260,7 @@ classdef Node < handle
       try
         out = cell(1, outnum);
         [out{:}] = f(inpvals{:});
-        this.setWorkingValue(out{end});  % Store in working value (phase 1)
+        this.workingValue = out{end};  % Store in working value (phase 1)
         valset = true;
       catch ex
         inputIds = [this.Inputs.Id];
@@ -282,15 +287,13 @@ classdef Node < handle
       if numel(this.Inputs) >= 1
         input = this.Inputs(1);
 
-        % save Nil so I don't keep calling instance()
-        nilInstance = sig.Nil.instance();
 
         % mex logic: working value if exists, otherwise current value
-        if input.workingValue ~= nilInstance
+        if ~isa(input.workingValue, 'sig.Nil')
           % Input has a working value (new value) - use it and compute
-          this.setWorkingValue(input.workingValue);
+          this.workingValue = input.workingValue;
           valset = true;
-        elseif input.CurrValue ~= nilInstance
+        elseif ~isa(input.CurrValue, 'sig.Nil')
           % Input has current value but no working value - don't compute (no change)
           valset = false;
         else
@@ -307,14 +310,13 @@ classdef Node < handle
       % See +sig/+transfer/map.m for MEX reference
       f = this.transArg;
       input = this.Inputs(1);
-      nilInstance = sig.Nil.instance();
 
       % Only compute if input has a working value (new value)
-      if input.workingValue ~= nilInstance
+      if ~isa(input.workingValue, 'sig.Nil')
         wv = input.workingValue;
         try
           val = f(wv);
-          this.setWorkingValue(val);
+          this.workingValue = val;
           valset = true;
         catch ex
           inputId = input.Id;
@@ -346,11 +348,12 @@ classdef Node < handle
       % But if inputs share a node, multiple could update:
       %   a = x * 2; b = x + 1; m = merge(a, b);
       %   x.post2(5);  % both a and b have workingValues -> m gets a (first one)
-      nilInstance = sig.Nil.instance();
 
-      for i = 1:numel(this.Inputs)
-        if this.Inputs(i).workingValue ~= nilInstance
-          this.setWorkingValue(this.Inputs(i).workingValue);
+      inputs = this.Inputs;  % cache the property, read once not per loop pass
+      for i = 1:numel(inputs)
+        wv = inputs(i).workingValue;  % read the property once, not twice
+        if ~isa(wv, 'sig.Nil')
+          this.workingValue = wv;
           valset = true;
           return
         end
@@ -369,13 +372,12 @@ classdef Node < handle
       % pass through workingValue.
       % Example: b = a.filter(@ischar, true) passes value only if it's a char.
       f = this.transArg;
-      nilInstance = sig.Nil.instance();
 
       % Get condition using LATEST_VALUE logic
       nCondition = this.Inputs(2);
-      if nCondition.workingValue ~= nilInstance
+      if ~isa(nCondition.workingValue, 'sig.Nil')
         condition = nCondition.workingValue;
-      elseif nCondition.CurrValue ~= nilInstance
+      elseif ~isa(nCondition.CurrValue, 'sig.Nil')
         condition = nCondition.CurrValue;
       else
         % MEX L31-33: filter.m returns here without assigning its outputs,
@@ -386,12 +388,12 @@ classdef Node < handle
 
       % Only proceed if node n has a working value
       n = this.Inputs(1);
-      if n.workingValue ~= nilInstance
+      if ~isa(n.workingValue, 'sig.Nil')
         what = n.workingValue;
         try
           indicator = f(what);
           if indicator == condition
-            this.setWorkingValue(what);
+            this.workingValue = what;
             valset = true;
             return
           end
@@ -418,27 +420,26 @@ classdef Node < handle
       % this.Inputs(1) is 'what' - the value to sample
       % this.Inputs(2) is 'when' - the trigger
       % Example: clickedPos = pos.at(click) - grab pos value when click fires
-      nilInstance = sig.Nil.instance();
 
       % In MEX: [when, whenset] = workingNodeValue(net, inputs(2))
       % Here we just access the node's workingValue directly
       nWhen = this.Inputs(2);
       whenWorking = nWhen.workingValue;
 
-      % whenset in MEX tells us if working value exists, we check ~= Nil instead
-      if whenWorking ~= nilInstance
+      % whenset in MEX tells us if working value exists, we check isa Nil instead
+      if ~isa(whenWorking, 'sig.Nil')
         % MEX L11: plain if, so a non-scalar 'when' gates on all of its
         % elements being non-zero, and empty gates closed
         if whenWorking
           % Now get 'what' value - try working first, fall back to current
           % MEX does: [what, whatset] = workingNodeValue(...) then currNodeValue(...)
           nWhat = this.Inputs(1);
-          if nWhat.workingValue ~= nilInstance
-            this.setWorkingValue(nWhat.workingValue);
+          if ~isa(nWhat.workingValue, 'sig.Nil')
+            this.workingValue = nWhat.workingValue;
             valset = true;
             return
-          elseif nWhat.CurrValue ~= nilInstance
-            this.setWorkingValue(nWhat.CurrValue);
+          elseif ~isa(nWhat.CurrValue, 'sig.Nil')
+            this.workingValue = nWhat.CurrValue;
             valset = true;
             return
           end
@@ -454,14 +455,13 @@ classdef Node < handle
       %
       % this.Inputs(1) is the new sample to append
       % this.Inputs(2) is the max buffer size
-      nilInstance = sig.Nil.instance();
 
       % MEX L26-32: Get max buffer size using LATEST_VALUE logic
       nMaxSamps = this.Inputs(2);
-      if nMaxSamps.workingValue ~= nilInstance
+      if ~isa(nMaxSamps.workingValue, 'sig.Nil')
         maxSamps = nMaxSamps.workingValue;
         % No zero check here — matches MEX (zero check only in currValue branch)
-      elseif nMaxSamps.CurrValue ~= nilInstance
+      elseif ~isa(nMaxSamps.CurrValue, 'sig.Nil')
         maxSamps = nMaxSamps.CurrValue;
         if ~maxSamps  % zero check matches MEX L29
           valset = false;
@@ -475,7 +475,7 @@ classdef Node < handle
       % MEX L35: Get current buffer contents from this node's own currValue
       % In MEX, currNodeValue returns [] when no value set yet.
       % Here currValue is Nil initially, so convert to [] for first call.
-      if this.CurrValue ~= nilInstance
+      if ~isa(this.CurrValue, 'sig.Nil')
         buff = this.CurrValue;
       else
         buff = [];
@@ -483,7 +483,7 @@ classdef Node < handle
 
       % MEX L37-38: Only proceed if new sample has a working value
       newval = this.Inputs(1).workingValue;
-      if newval ~= nilInstance
+      if ~isa(newval, 'sig.Nil')
         try
           % MEX L40-46: Concatenation logic
           free = size(buff, 2) - maxSamps;
@@ -492,7 +492,7 @@ classdef Node < handle
           else  % buffer not full, just append
             val = [buff newval];
           end
-          this.setWorkingValue(val);
+          this.workingValue = val;
           valset = true;
         catch ex
           % MEX L48-51: same format string, including the Concatinating typo
@@ -513,7 +513,6 @@ classdef Node < handle
     function valset = indexOfFirst(this)
       % indexOfFirst transfer function - returns index of first true input
       % See +sig/+transfer/indexOfFirst.m for MEX reference
-      nilInstance = sig.Nil.instance();
 
       % MEX L5: n = numel(inputs)
       n = numel(this.Inputs);
@@ -522,7 +521,7 @@ classdef Node < handle
       noMatch = n + 1;
 
       % MEX L9-12: get this node's current value (the current match index)
-      if this.CurrValue ~= nilInstance
+      if ~isa(this.CurrValue, 'sig.Nil')
         currMatch = this.CurrValue;
       else
         currMatch = Inf;
@@ -537,7 +536,7 @@ classdef Node < handle
       for inp = 1:n
         % MEX L19: get latest predicate value — working first, then current
         inputNode = inputs(inp);
-        if inputNode.workingValue ~= nilInstance
+        if ~isa(inputNode.workingValue, 'sig.Nil')
           % MEX L20-30: input has a new working value
           pred = inputNode.workingValue;
           predset = true;
@@ -551,7 +550,7 @@ classdef Node < handle
               return
             end
           end
-        elseif inputNode.CurrValue ~= nilInstance
+        elseif ~isa(inputNode.CurrValue, 'sig.Nil')
           % MEX L20-21: no working value, fall back to current
           pred = inputNode.CurrValue;
           predset = true;
@@ -561,21 +560,21 @@ classdef Node < handle
 
         % MEX L33-38: predicate has no value — can't evaluate further
         if ~predset
-          this.setWorkingValue(noMatch);
+          this.workingValue = noMatch;
           valset = true;
           return
         end
 
         % MEX L40-44: predicate is true — this is the first match
         if pred
-          this.setWorkingValue(inp);
+          this.workingValue = inp;
           valset = true;
           return
         end
       end
 
       % MEX L46-48: no matching predicate found
-      this.setWorkingValue(noMatch);
+      this.workingValue = noMatch;
       valset = true;
     end
 
@@ -586,13 +585,12 @@ classdef Node < handle
       % this.Inputs(1) is 'what' - the value to gate
       % this.Inputs(2) is 'when' - the gate signal
       % Only passes 'what' working value (no current fallback for 'what')
-      nilInstance = sig.Nil.instance();
 
       % MEX L25-28: get latest 'when' value — LATEST_VALUE pattern
       nWhen = this.Inputs(2);
-      if nWhen.workingValue ~= nilInstance
+      if ~isa(nWhen.workingValue, 'sig.Nil')
         when = nWhen.workingValue;
-      elseif nWhen.CurrValue ~= nilInstance
+      elseif ~isa(nWhen.CurrValue, 'sig.Nil')
         when = nWhen.CurrValue;
       else
         % MEX L30: whenwvset || whencvset fails — no value at all
@@ -604,8 +602,8 @@ classdef Node < handle
       if when
         % MEX L33-38: get 'what' WORKING value only (no current fallback)
         nWhat = this.Inputs(1);
-        if nWhat.workingValue ~= nilInstance
-          this.setWorkingValue(nWhat.workingValue);
+        if ~isa(nWhat.workingValue, 'sig.Nil')
+          this.workingValue = nWhat.workingValue;
           valset = true;
           return
         end
@@ -621,16 +619,15 @@ classdef Node < handle
       %
       % Assumes one input. Compares input's working value against this
       % node's own currValue using isequal. First value always passes.
-      nilInstance = sig.Nil.instance();
 
       % MEX L8-9: Get new value from input's working value
       wv = this.Inputs(1).workingValue;
-      if wv ~= nilInstance
+      if ~isa(wv, 'sig.Nil')
         % MEX L10-11: Compare against this node's own currValue
         % ~cvset (Nil) means no current value yet — always pass through
         % ~isequal means value changed — pass through
-        if this.CurrValue == nilInstance || ~isequal(wv, this.CurrValue)
-          this.setWorkingValue(wv);
+        if isa(this.CurrValue, 'sig.Nil') || ~isequal(wv, this.CurrValue)
+          this.workingValue = wv;
           valset = true;
           return
         end
@@ -649,13 +646,12 @@ classdef Node < handle
       %
       % Only reacts to working values (no LATEST_VALUE fallback) — latch
       % cares about fresh updates in this transaction, not stale values.
-      nilInstance = sig.Nil.instance();
 
       % MEX L6-7: working values only
       armWV = this.Inputs(1).workingValue;
       releaseWV = this.Inputs(2).workingValue;
-      armSet = armWV ~= nilInstance;
-      releaseSet = releaseWV ~= nilInstance;
+      armSet = ~isa(armWV, 'sig.Nil');
+      releaseSet = ~isa(releaseWV, 'sig.Nil');
 
       % MEX L10: current armed state from this node's own CurrValue
       armed = this.CurrValue;
@@ -666,10 +662,10 @@ classdef Node < handle
 
       % MEX L15-27: release takes priority over arming
       if tryRelease && (tryArm || armed)
-        this.setWorkingValue(false);
+        this.workingValue = false;
         valset = true;
       elseif ~armed && tryArm
-        this.setWorkingValue(true);
+        this.workingValue = true;
         valset = true;
       else
         valset = false;
@@ -689,13 +685,12 @@ classdef Node < handle
       % makes the apply phase concatenate. Here we accumulate directly.
 
       % MEX L5: working value only (no LATEST_VALUE fallback)
-      nilInstance = sig.Nil.instance();
       wv = this.Inputs(1).workingValue;
-      if wv ~= nilInstance
+      if ~isa(wv, 'sig.Nil')
         % MEX L9: create timestamped entry
         entry = struct('time', this.transArg(), 'value', wv);
         % Accumulate onto existing log (MEX does this via appendValues in apply phase)
-        this.setWorkingValue([this.CurrValue entry]);
+        this.workingValue = [this.CurrValue entry];
         valset = true;
       else
         valset = false;
@@ -709,13 +704,12 @@ classdef Node < handle
       % this.Inputs(1) is 'what' - the value to deliver after delay
       % this.Inputs(2) is 'delay' - the delay duration
       % Output is a cell {what, delay} "packet" used by delayedPost
-      nilInstance = sig.Nil.instance();
 
       % MEX L13-16: get latest 'delay' value — LATEST_VALUE pattern
       nDelay = this.Inputs(2);
-      if nDelay.workingValue ~= nilInstance
+      if ~isa(nDelay.workingValue, 'sig.Nil')
         delay = nDelay.workingValue;
-      elseif nDelay.CurrValue ~= nilInstance
+      elseif ~isa(nDelay.CurrValue, 'sig.Nil')
         delay = nDelay.CurrValue;
       else
         valset = false;
@@ -724,9 +718,9 @@ classdef Node < handle
 
       % MEX L18: get 'what' WORKING value only (no current fallback)
       what = this.Inputs(1).workingValue;
-      if what ~= nilInstance
+      if ~isa(what, 'sig.Nil')
         % MEX L21: output schedule packet
-        this.setWorkingValue({what delay});
+        this.workingValue = {what delay};
         valset = true;
       else
         valset = false;
@@ -740,7 +734,6 @@ classdef Node < handle
       % Input layout: [item_1, ..., item_n, seed, par_1, ..., par_m]
       % this.transArg = funcs (cell array, one function per element input)
       % this.CurrValue holds the accumulator (initialised from seed by Signal.m)
-      nilInstance = sig.Nil.instance();
       funcs = this.transArg;
       inputs = this.Inputs;
       nElemInps = numel(funcs);
@@ -748,14 +741,14 @@ classdef Node < handle
 
       % MEX L10-18: seed override — if seed has working value, use it
       seedNode = inputs(nElemInps + 1);
-      if seedNode.workingValue ~= nilInstance
+      if ~isa(seedNode.workingValue, 'sig.Nil')
         val = seedNode.workingValue;
         valavail = true;
         valset = true;
       else
         % MEX L17: use this node's own CurrValue as accumulator
         val = this.CurrValue;
-        valavail = val ~= nilInstance;
+        valavail = ~isa(val, 'sig.Nil');
         valset = false;
       end
 
@@ -764,15 +757,15 @@ classdef Node < handle
       pars = cell(1, nParInps);
       for ii = 1:nParInps
         parNode = inputs(nElemInps + 1 + ii);
-        if parNode.workingValue ~= nilInstance
+        if ~isa(parNode.workingValue, 'sig.Nil')
           pars{ii} = parNode.workingValue;
-        elseif parNode.CurrValue ~= nilInstance
+        elseif ~isa(parNode.CurrValue, 'sig.Nil')
           pars{ii} = parNode.CurrValue;
         else
           % MEX L28: bail out — but if seed override set valset=true,
           % we must still propagate the seed value
           if valset
-            this.setWorkingValue(val);
+            this.workingValue = val;
           end
           return
         end
@@ -781,7 +774,7 @@ classdef Node < handle
       % MEX L34-55: apply scan functions to element inputs
       for ii = 1:nElemInps
         itemWV = inputs(ii).workingValue;
-        if valavail && itemWV ~= nilInstance
+        if valavail && ~isa(itemWV, 'sig.Nil')
           f = funcs{ii};
           try
             val = f(val, itemWV, pars{:});
@@ -802,7 +795,7 @@ classdef Node < handle
 
       % MEX: if valset, store the accumulated result
       if valset
-        this.setWorkingValue(val);
+        this.workingValue = val;
       end
     end
 
@@ -814,9 +807,10 @@ classdef Node < handle
       % this.Inputs(2) is the 'source' — dynamically wired to whatever signal the director holds
       % this.transArg is a StructRef with 'unappliedInputChanges' flag (persists across calls)
       %
-      % Note: we use isa(x, 'sig.Nil') instead of x == nilInstance because
-      % the value being held may itself be a Signal, and Signal overloads
-      % == / ~= to build a new comparison Signal rather than return a bool.
+      % Note: we use isa(x, 'sig.Nil') rather than comparing against the
+      % Nil instance because the value being held may itself be a Signal,
+      % and Signal overloads == / ~= to build a new comparison Signal
+      % rather than return a bool.
       state = this.transArg;
       director = this.Inputs(1);
       valset = false; % MEX L30: default to false
@@ -834,7 +828,7 @@ classdef Node < handle
         else
           % Director value is regular — return it directly
           this.setInputs(director); % remove source if any
-          this.setWorkingValue(dirWorking);
+          this.workingValue = dirWorking;
           return
         end
 
@@ -869,13 +863,13 @@ classdef Node < handle
         source = this.Inputs(2);
         sourceWV = source.workingValue;
         if ~isa(sourceWV, 'sig.Nil')
-          this.setWorkingValue(sourceWV);
+          this.workingValue = sourceWV;
           valset = true;
         elseif valset
           % New source connection was made earlier, take source's current value
           sourceCV = source.CurrValue;
           if ~isa(sourceCV, 'sig.Nil')
-            this.setWorkingValue(sourceCV);
+            this.workingValue = sourceCV;
             % valset stays true
           else
             valset = false;
@@ -894,15 +888,14 @@ classdef Node < handle
       % Tricky bit: only emit when the indexer or the chosen option actually
       % just changed. Without that check, the same pair would get re-emitted
       % every time the node was visited even when nothing relevant changed.
-      nilInstance = sig.Nil.instance();
       nOptions = numel(this.Inputs) - 1;
 
       % MEX L9-12: grab the latest indexer value, working first then current
       indexer = this.Inputs(1);
-      if indexer.workingValue ~= nilInstance
+      if ~isa(indexer.workingValue, 'sig.Nil')
         idx = indexer.workingValue;
         idxwvset = true;
-      elseif indexer.CurrValue ~= nilInstance
+      elseif ~isa(indexer.CurrValue, 'sig.Nil')
         idx = indexer.CurrValue;
         idxwvset = false;
       else
@@ -914,11 +907,11 @@ classdef Node < handle
       % MEX L21-32: if idx is in range, try to get the option's value
       if idx <= nOptions
         option = this.Inputs(idx + 1);
-        if option.workingValue ~= nilInstance
+        if ~isa(option.workingValue, 'sig.Nil')
           selval = option.workingValue;
           selwvvalset = true;
           selcvvalset = false;
-        elseif option.CurrValue ~= nilInstance
+        elseif ~isa(option.CurrValue, 'sig.Nil')
           selval = option.CurrValue;
           selwvvalset = false;
           selcvvalset = true;
@@ -930,7 +923,7 @@ classdef Node < handle
         % MEX L26-31: only emit if we have a value AND either the idx or
         % the option changed this round
         if (selwvvalset || selcvvalset) && (idxwvset || selwvvalset)
-          this.setWorkingValue(selval);
+          this.workingValue = selval;
           valset = true;
           return
         end
@@ -959,24 +952,27 @@ classdef Node < handle
       % We need a value on every input (working or current). We only emit
       % if at least one of them was just updated this round.
       type = this.transArg;
-      nilInstance = sig.Nil.instance();
-      nInputs = numel(this.Inputs);
+      inputs = this.Inputs;  % cache the property, read once not per loop pass
+      nInputs = numel(inputs);
       inpvals = cell(nInputs, 1);
       wvset = false(nInputs, 1);
 
       % MEX L8-25: grab every input's value, working first then current.
       % bail out as soon as we find an input with no value at all
       for k = 1:nInputs
-        input = this.Inputs(k);
-        if input.workingValue ~= nilInstance
-          inpvals{k} = input.workingValue;
+        input = inputs(k);
+        wv = input.workingValue;  % read the property once, not twice
+        if ~isa(wv, 'sig.Nil')
+          inpvals{k} = wv;
           wvset(k) = true;
-        elseif input.CurrValue ~= nilInstance
-          inpvals{k} = input.CurrValue;
-          wvset(k) = false;
         else
-          valset = false;
-          return
+          cv = input.CurrValue;
+          if ~isa(cv, 'sig.Nil')
+            inpvals{k} = cv;
+          else
+            valset = false;
+            return
+          end
         end
       end
 
@@ -996,7 +992,7 @@ classdef Node < handle
           valset = false;
           return
         end
-        this.setWorkingValue(what.(subs));
+        this.workingValue = what.(subs);
         valset = true;
         return
       end
@@ -1017,7 +1013,7 @@ classdef Node < handle
       % Dispatches on the class of 'what' so values with their own
       % indexing keep that behaviour. No collision with this method since
       % it is not named subsref.
-      this.setWorkingValue(subsref(what, s));
+      this.workingValue = subsref(what, s);
       valset = true;
     end
 
