@@ -167,6 +167,14 @@ classdef OriginSignal < sig.node.Signal
         % Apply all working values to current values
         for i = 1:length(affectedNodes)
             node = affectedNodes{i};
+            % MEX network.c L368: skip nodes with no working value to apply.
+            % A node can appear more than once in the affected list and the
+            % first pass commits and clears its value, so this also stops
+            % the event target being notified twice for one commit. Same
+            % goes for values retracted during the transaction.
+            if isa(node.workingValue, 'sig.Nil')
+                continue
+            end
             node.commitWorkingValue();
             % Notify event target after commit (matches MEX network.c L378-381)
             if ~isempty(node.EventTarget)
