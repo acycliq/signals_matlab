@@ -521,10 +521,21 @@ classdef Signal < sig.Signal & handle
       end
       h = TidyHandle(@unsub);
       function unsub()
+        % The signal, and with it the callback map, may already be gone
+        % when this runs. That happens when a callback is a nested
+        % function whose workspace holds the listener handle: the map
+        % then keeps the handle alive, so during network teardown the
+        % signal dies first and the handle last. Nothing left to
+        % unsubscribe from in that case.
+        if ~isvalid(this)
+          return
+        end
         this.OnValueCallbacks.remove(callbackidx);
         if isempty(this.OnValueCallbacks) % list now empty
           % remove us as the event target from the mxnode
-          this.Node.EventTarget = [];
+          if isvalid(this.Node)
+            this.Node.EventTarget = [];
+          end
         end
       end
     end
