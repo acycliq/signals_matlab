@@ -109,11 +109,12 @@ classdef Net < handle
         dueIdx = [this.Schedule.when] < GetSecs;
         dueTasks = this.Schedule(dueIdx);
         this.Schedule(dueIdx) = [];
-        % work through them
+        % work through them, each due task is its own full transaction,
+        % delivered through the pure engine instead of the MEX
+        % submit + applyNodes pair (same operation, see sig.node.Node/transact)
         for ti = 1:numel(dueTasks)
           % dt = GetSecs - dueTasks(ti).when;
-          affectedIdxs = submit(this.Id, dueTasks(ti).nodeid, dueTasks(ti).value);
-          applyNodes(this.Id, affectedIdxs);
+          this.nodes{dueTasks(ti).nodeid}.transact(dueTasks(ti).value);
         end
       end
     end
