@@ -1326,6 +1326,204 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       testCase.verifyEqual(acc.Node.CurrValue, 'start_1_2_3');
     end
 
+    %% flattenStruct Tests (no MATLAB reference, the spec is network.c L852-899)
+    function test_flattenStruct_fresh_blueprint_emits_empties(testCase)
+      % A fresh blueprint emits the non-signal fields and EMPTY signal
+      % fields, even when the field signals already hold values. The C
+      % never pulls a field signal's current value in, fields only fill
+      % when their signal updates while wired (network.c L876-889).
+      [a, b, bp] = deal(testCase.A, testCase.B, testCase.C);
+      flat = bp.flattenStruct();
+
+      a.post2(1);
+      b.post2(2);
+      bp.post2(struct('x', a, 'y', b, 'name', 'hello'));
+
+      expected = struct;
+      expected.x = [];
+      expected.y = [];
+      expected.name = 'hello';
+      testCase.verifyEqual(flat.Node.CurrValue, expected, ...
+        'fresh blueprint must emit empty signal fields');
+    end
+
+    function test_flattenStruct_field_updates_fill_and_accumulate(testCase)
+      % Fields fill one by one as their signals update, and accumulate on
+      % the node's own current value in steady state (network.c L872)
+      [a, b, bp] = deal(testCase.A, testCase.B, testCase.C);
+      flat = bp.flattenStruct();
+
+      bp.post2(struct('x', a, 'y', b));
+
+      a.post2(10);
+      expected = struct;
+      expected.x = 10;
+      expected.y = [];
+      testCase.verifyEqual(flat.Node.CurrValue, expected, ...
+        'first field update must fill only that field');
+
+      b.post2(20);
+      expected.y = 20;
+      testCase.verifyEqual(flat.Node.CurrValue, expected, ...
+        'second update must keep the first field');
+
+      a.post2(11);
+      expected.x = 11;
+      testCase.verifyEqual(flat.Node.CurrValue, expected);
+    end
+
+    function test_flattenStruct_undo_branch_wipes_same_transaction_fills(testCase)
+      % The first trigger after a blueprint post takes the undo branch
+      % (network.c L861-869), which re-parses the blueprint to fresh
+      % empties before patching. A field that was filled during the
+      % blueprint's own transaction is wiped and stays empty until its
+      % signal fires again. Quirky, but it is exactly what the C does.
+      [src, indep] = deal(testCase.A, testCase.B);
+      doubled = src * 2;
+      bpSig = src.map(@(v) struct('x', doubled, 'y', indep, 'n', v));
+      flat = bpSig.flattenStruct();
+
+      src.post2(1);  % blueprint and doubled update in the SAME transaction
+      expected = struct;
+      expected.x = 2;
+      expected.y = [];
+      expected.n = 1;
+      testCase.verifyEqual(flat.Node.CurrValue, expected, ...
+        'a field updating in the blueprint transaction must be patched in');
+
+      indep.post2(5);  % first non-blueprint trigger takes the undo branch
+      expected.x = [];
+      expected.y = 5;
+      testCase.verifyEqual(flat.Node.CurrValue, expected, ...
+        'undo branch re-parses to empties, x must be wiped');
+
+      indep.post2(6);  % steady state accumulates from here on
+      expected.y = 6;
+      testCase.verifyEqual(flat.Node.CurrValue, expected);
+    end
+
+    function test_flattenStruct_blueprint_repost_rewires(testCase)
+      % Posting a new blueprint reconfigures the wiring (the dynamic path
+      % Miles asked to keep as implemented): old field signals are
+      % disconnected, new ones take over, fresh empties are emitted
+      [a, b, bp] = deal(testCase.A, testCase.B, testCase.C);
+      flat = bp.flattenStruct();
+
+      bp.post2(struct('x', a));
+      a.post2(10);
+      testCase.verifyEqual(flat.Node.CurrValue, struct('x', 10));
+
+      bp.post2(struct('z', b));  % entirely new struct with a new signal
+      expected = struct;
+      expected.z = [];
+      testCase.verifyEqual(flat.Node.CurrValue, expected, ...
+        'new blueprint must emit fresh empties');
+
+      prev = flat.Node.CurrValue;
+      a.post2(99);  % a is disconnected now, flat must not react
+      testCase.verifyEqual(flat.Node.CurrValue, prev, ...
+        'old field signal must be disconnected after a repost');
+
+      b.post2(7);
+      expected.z = 7;
+      testCase.verifyEqual(flat.Node.CurrValue, expected);
+    end
+
+    function test_flattenStruct_blueprint_adds_field(testCase)
+      % Miles 2026-05-18: the struct could have a field added. The repost
+      % re-parses, so existing field values are not retained
+      [a, b, bp] = deal(testCase.A, testCase.B, testCase.C);
+      flat = bp.flattenStruct();
+
+      bp.post2(struct('x', a));
+      a.post2(1);
+      testCase.verifyEqual(flat.Node.CurrValue, struct('x', 1));
+
+      bp.post2(struct('x', a, 'y', b));  % field added
+      expected = struct;
+      expected.x = [];
+      expected.y = [];
+      testCase.verifyEqual(flat.Node.CurrValue, expected, ...
+        'repost emits empties, previous x value is not retained');
+
+      a.post2(2);
+      expected.x = 2;
+      testCase.verifyEqual(flat.Node.CurrValue, expected);
+
+      b.post2(3);
+      expected.y = 3;
+      testCase.verifyEqual(flat.Node.CurrValue, expected);
+    end
+
+    function test_flattenStruct_no_signal_fields(testCase)
+      % A blueprint without any signal fields just passes through, and
+      % every blueprint post emits (network.c L856-859 always sets output)
+      bp = testCase.A;
+      flat = bp.flattenStruct();
+
+      s = struct('a', 1, 'b', 'text');
+      bp.post2(s);
+      testCase.verifyEqual(flat.Node.CurrValue, s);
+
+      s2 = struct('a', 2, 'b', 'other');
+      bp.post2(s2);
+      testCase.verifyEqual(flat.Node.CurrValue, s2, ...
+        'every blueprint post must emit');
+    end
+
+    function test_flattenStruct_struct_array_blueprint(testCase)
+      % Non-scalar blueprints are supported, the parse maps each signal to
+      % its linear element index (flattenSignalStruct.m structIdxs)
+      [a, bp] = deal(testCase.A, testCase.C);
+      flat = bp.flattenStruct();
+
+      bp.post2(struct('v', {1, a}));  % 1x2 struct array, signal in element 2
+      testCase.verifyEqual(flat.Node.CurrValue, struct('v', {1, []}));
+
+      a.post2(42);
+      testCase.verifyEqual(flat.Node.CurrValue, struct('v', {1, 42}), ...
+        'update must land in element 2 of the struct array');
+    end
+
+    function test_flattenStruct_duplicate_signal_two_fields(testCase)
+      % The same signal in two fields wires two field inputs to one node,
+      % one update patches both slots
+      [a, bp] = deal(testCase.A, testCase.C);
+      flat = bp.flattenStruct();
+
+      bp.post2(struct('x', a, 'y', a));
+      a.post2(5);
+      expected = struct;
+      expected.x = 5;
+      expected.y = 5;
+      testCase.verifyEqual(flat.Node.CurrValue, expected, ...
+        'one update must fill both fields');
+    end
+
+    function test_flattenStruct_nonstruct_blueprint_errors(testCase)
+      % The parse helper calls fieldnames on the blueprint, so a
+      % non-struct post errors exactly as MEX's mexCallMATLAB round trip
+      % into the same helper did
+      bp = testCase.A;
+      flat = bp.flattenStruct();
+
+      testCase.verifyError(@() bp.post2(5), 'MATLAB:fieldnames:InvalidInput');
+    end
+
+    function test_flattenStruct_no_update_returns_false(testCase)
+      % A visit with no new blueprint and no field updates emits nothing
+      % (network.c L896-898)
+      [a, bp] = deal(testCase.A, testCase.C);
+      flat = bp.flattenStruct();
+
+      bp.post2(struct('x', a));
+      a.post2(1);
+
+      result = flat.Node.flattenStruct();
+      testCase.verifyFalse(result, ...
+        'no new values, the transfer must not set an output');
+    end
+
     %% schedule/delay tests (full pipeline: schedule -> onValue -> delayedPost -> Net.Schedule)
     function test_delay_basic(testCase)
       % delay() queues a scheduled entry in Net.Schedule
