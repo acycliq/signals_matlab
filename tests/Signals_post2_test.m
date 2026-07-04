@@ -1607,6 +1607,89 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       testCase.verifyEqual(numel(net.Schedule), 3);
       testCase.verifyEqual(net.Schedule(3).value, 300);
     end
+
+    %% runSchedule delivery tests (need real GetSecs, Windows only)
+    function test_runSchedule_delivers_due(testCase)
+      % A due task is delivered through the pure engine as a full
+      % transaction and removed from the schedule
+      net = testCase.net;
+      a = net.origin('a');
+      period = net.origin('period');
+      d = a.delay(period);
+
+      period.post2(0);
+      a.post2(42);
+      testCase.verifyEqual(numel(net.Schedule), 1);
+
+      net.runSchedule();
+      testCase.verifyEqual(d.Node.CurrValue, 42, ...
+        'due task must be delivered');
+      testCase.verifyEqual(numel(net.Schedule), 0, ...
+        'delivered task must be removed from the schedule');
+    end
+
+    function test_runSchedule_leaves_future_tasks(testCase)
+      % A task that is not yet due stays scheduled and is not delivered
+      net = testCase.net;
+      a = net.origin('a');
+      period = net.origin('period');
+      d = a.delay(period);
+
+      period.post2(1000);
+      a.post2(7);
+
+      net.runSchedule();
+      testCase.verifyTrue(d.Node.CurrValue == sig.Nil.instance(), ...
+        'future task must not be delivered');
+      testCase.verifyEqual(numel(net.Schedule), 1, ...
+        'future task must stay in the schedule');
+    end
+
+    function test_runSchedule_delivers_in_order(testCase)
+      % Multiple due tasks deliver in schedule order, each as its own
+      % transaction, exactly as the MEX submit + applyNodes loop did
+      net = testCase.net;
+      a = net.origin('a');
+      period = net.origin('period');
+      d = a.delay(period);
+      buf = d.bufferUpTo(10);
+
+      period.post2(0);
+      a.post2(1);
+      a.post2(2);
+      testCase.verifyEqual(numel(net.Schedule), 2);
+
+      net.runSchedule();
+      testCase.verifyEqual(buf.Node.CurrValue, [1 2], ...
+        'deliveries must run in schedule order as separate transactions');
+      testCase.verifyEqual(d.Node.CurrValue, 2);
+      testCase.verifyEqual(numel(net.Schedule), 0);
+    end
+
+    function test_runSchedule_reentrant_tasks_wait(testCase)
+      % A delivery that schedules another task (chained delays) must not
+      % have the new task delivered in the same call, due tasks are sliced
+      % out before delivering starts
+      net = testCase.net;
+      a = net.origin('a');
+      period = net.origin('period');
+      d = a.delay(period);
+      e = d.delay(period);
+
+      period.post2(0);
+      a.post2(5);
+      testCase.verifyEqual(numel(net.Schedule), 1);
+
+      net.runSchedule();  % delivers d, which schedules e's packet
+      testCase.verifyEqual(d.Node.CurrValue, 5);
+      testCase.verifyTrue(e.Node.CurrValue == sig.Nil.instance(), ...
+        'task scheduled during delivery must wait for the next call');
+      testCase.verifyEqual(numel(net.Schedule), 1);
+
+      net.runSchedule();  % second call delivers e
+      testCase.verifyEqual(e.Node.CurrValue, 5);
+      testCase.verifyEqual(numel(net.Schedule), 0);
+    end
     %% Missing test coverage from Signals_test.m
 
     function test_filter_char_expression(testCase)
