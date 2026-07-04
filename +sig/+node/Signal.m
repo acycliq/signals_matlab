@@ -479,11 +479,21 @@ classdef Signal < sig.Signal & handle
       % rather than taking the value of the signal fields themselves.
       %
       % `fs` uses `this` as a blueprint to wire up signals as inputs to
-      % itself. The values of the signal fields in `this` will be directly 
-      % set as `fs`'s struct field values. This is done in mexnet according
-      % to the transfer opCode.
-      
-      fs = applyTransferFun(this, 'sig.transfer.flattenStruct', [], '%s.flattenStruct()');
+      % itself. The values of the signal fields in `this` will be directly
+      % set as `fs`'s struct field values. In mexnet this was done in C
+      % according to the transfer opCode (network.c L852-899), here it is
+      % the flattenStruct method on Node.
+
+      % The C kept its state on the transferer struct (network.h L46-48:
+      % workingInputChanges, targetIndices, targetFields). Here it lives
+      % in the transfer arg as a plain struct, the Node method reassigns
+      % it when it changes. fieldNames is ours: the C patched fields by
+      % number, MATLAB patches by name, same thing since the parse
+      % preserves the blueprint's field order.
+      state = struct('workingInputChanges', false, ...
+        'targetIndices', [], 'targetFields', [], 'fieldNames', {{}});
+      fs = applyTransferFun(this, 'sig.transfer.flattenStruct', state, ...
+        '%s.flattenStruct()');
 
     end
     

@@ -1039,6 +1039,102 @@ classdef Node < handle
       valset = true;
     end
 
+    function valset = flattenStruct(this)
+      % flattenStruct transfer function - flattens a struct blueprint
+      % whose fields may be Signals, wiring those signals in as inputs so
+      % their updates set the struct fields directly.
+      % There is no MATLAB reference for this one, the MEX implements it
+      % in C: network.c L852-899 (flattenStruct) plus L817-850
+      % (flattenSignalStruct). Line refs below are network.c.
+      %
+      % this.Inputs(1) is the blueprint input. Inputs(2..end) are the
+      % field inputs, wired dynamically, one per Signal in the blueprint.
+      % this.transArg is a plain struct (the C kept the same state on its
+      % transferer, network.h L46-48): workingInputChanges flags that the
+      % inputs were rewired from an uncommitted blueprint, and
+      % targetIndices/targetFields/fieldNames map field input k to
+      % structval(targetIndices(k)).(fieldNames{targetFields(k)}).
+      %
+      % Fields fill only when their signal updates while wired. A fresh
+      % blueprint emits EMPTY signal fields (see flattenSignalStruct.m:
+      % all fields that are Signals in the blueprint are empty), current
+      % values of the field signals are never pulled in.
+      state = this.transArg;
+      newOutputSet = false; % L853
+      blueprintInp = this.Inputs(1); % L855
+
+      bwv = blueprintInp.workingValue;
+      if ~isa(bwv, 'sig.Nil') % L856: new blueprint struct to reconfigure using
+        [structval, state] = rewireFromBlueprint(this, bwv, state);
+        state.workingInputChanges = true; % L858
+        this.transArg = state;
+        newOutputSet = true; % L859
+      else % L860: no new blueprint struct to process
+        if state.workingInputChanges % L861: need to undo input changes
+          bcv = blueprintInp.CurrValue;
+          if ~isa(bcv, 'sig.Nil') % L862: existing blueprint available
+            [structval, state] = rewireFromBlueprint(this, bcv, state);
+          else % L865-868: no blueprint available, eliminate field inputs
+            this.setInputs(blueprintInp);
+            structval = []; % L867: a dummy that just gets discarded later
+          end
+          state.workingInputChanges = false; % L869
+          this.transArg = state;
+        else % L871-872: no working input changes to undo
+          % MATLAB copy on write plays the role of mxDuplicateArray, the
+          % copy happens lazily if the patch loop writes a field
+          structval = this.CurrValue;
+        end
+      end
+
+      % L876-889: check each field input, and update output if it changed
+      inputs = this.Inputs;
+      n = numel(inputs);
+      if n > 1
+        idxs = state.targetIndices;
+        fieldNo = state.targetFields;
+        names = state.fieldNames;
+        for i = 1:n-1 % field inputs are 2nd input onwards
+          wv = inputs(i + 1).workingValue;
+          if ~isa(wv, 'sig.Nil')
+            % L884-886: set field value to the field input working value
+            structval(idxs(i)).(names{fieldNo(i)}) = wv;
+            newOutputSet = true;
+          end
+        end
+      end
+
+      % L891-899
+      if newOutputSet
+        this.workingValue = structval;
+        valset = true;
+      else
+        valset = false;
+      end
+    end
+
+    function [structval, state] = rewireFromBlueprint(this, blueprint, state)
+      % MEX flattenSignalStruct, network.c L817-850: parse the blueprint
+      % with the same helper function the C called through mexCallMATLAB,
+      % store the patch tables, and wire the field nodes in as inputs
+      % 2..end with the blueprint input staying first (L839-842).
+      [structval, inpNodes, fieldIdxs, structIdxs] = ...
+        sig.node.flattenSignalStruct(blueprint);
+      state.targetFields = fieldIdxs; % L828
+      state.targetIndices = structIdxs; % L833
+      state.fieldNames = fieldnames(structval);
+      % the helper returns node ids like the C wanted, map them to the
+      % node objects. repmat of a handle just copies references, the loop
+      % overwrites them, this is only to preallocate the array.
+      n = numel(inpNodes);
+      newInputs = repmat(this.Inputs(1), 1, n + 1); % blueprint input stays first, L839
+      netNodes = this.Net.nodes;
+      for i = 1:n
+        newInputs(i + 1) = netNodes{inpNodes(i)};
+      end
+      this.setInputs(newInputs); % L843
+    end
+
 
   end
 
