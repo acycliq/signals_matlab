@@ -582,6 +582,110 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       end
     end
 
+    %% op code assignment (network.c transfer() dispatch)
+    function test_opcode_assignment(testCase)
+      % Binary op codes (MEX network.c L729-758) belong only on two input
+      % mapn nodes. mapn wraps its function as {f, outIdx} so the codes
+      % have to be recovered from the cell, and the bare handle rule in
+      % transfererOpCode must not leak binary codes onto map nodes.
+      [a, b] = deal(testCase.A, testCase.B);
+
+      c = a + b;
+      testCase.verifyEqual(c.Node.opCode, 1, ...
+        'a + b should carry the plus op code');
+
+      t = a * 2;
+      testCase.verifyEqual(t.Node.opCode, 4, ...
+        'a * 2 goes through mtimes, op code 4');
+
+      t2 = a .* 2;
+      testCase.verifyEqual(t2.Node.opCode, 3, ...
+        'a .* 2 goes through times, op code 3');
+
+      g = a > b;
+      testCase.verifyEqual(g.Node.opCode, 10, ...
+        'a > b should carry the gt op code');
+
+      p = a ^ 2;
+      testCase.verifyEqual(p.Node.opCode, 0, ...
+        'power has no op code, generic path');
+
+      % the trap: a bare binary handle on a one input map node. In MEX
+      % this would make transfer() read past the inputs array, here it
+      % must stay on the generic path.
+      m = a.map(@plus);
+      testCase.verifyEqual(m.Node.opCode, 0, ...
+        'map with a binary handle must stay generic');
+
+      % three input mapn with a binary handle must stay generic too
+      e = a.mapn(b, testCase.C, @plus);
+      testCase.verifyEqual(e.Node.opCode, 0, ...
+        'mapn with more than two inputs must stay generic');
+
+      % numel via map is the one op code that was live in MEX (op 30)
+      n = a.map(@numel);
+      testCase.verifyEqual(n.Node.opCode, 30, ...
+        'map with numel should carry op code 30');
+    end
+
+    function test_fastpath_vector_falls_back(testCase)
+      % The inline path only takes two double scalars (network.c L726,
+      % IS_DOUBLE_SCALAR). Vectors must drop to the generic mapn and give
+      % the ordinary elementwise result.
+      [a, b] = deal(testCase.A, testCase.B);
+      c = a + b;
+
+      a.post2([1 2 3]);
+      b.post2([10 20 30]);
+      testCase.verifyEqual(c.Node.CurrValue, [11 22 33], ...
+        'vector addition must fall back to the generic path');
+    end
+
+    function test_fastpath_integer_falls_back(testCase)
+      % Non double types must drop to the generic mapn. plus on int32
+      % scalars gives an int32, exactly as calling @plus does.
+      [a, b] = deal(testCase.A, testCase.B);
+      c = a + b;
+
+      a.post2(int32(5));
+      b.post2(int32(3));
+      testCase.verifyEqual(c.Node.CurrValue, int32(8), ...
+        'integer addition must fall back and keep the integer class');
+
+      % mixed double and integer also falls back, plus(5, int32(3))
+      a.post2(5);
+      testCase.verifyEqual(c.Node.CurrValue, int32(8), ...
+        'mixed class addition must match plus() semantics');
+    end
+
+    function test_fastpath_comparison_logical(testCase)
+      % Comparisons through the inline path must give logicals, same as
+      % @gt does (the C creates a logical scalar, network.c L744-745)
+      [a, b] = deal(testCase.A, testCase.B);
+      g = a > b;
+
+      a.post2(5);
+      b.post2(3);
+      testCase.verifyTrue(islogical(g.Node.CurrValue), ...
+        'comparison result must be logical');
+      testCase.verifyTrue(g.Node.CurrValue);
+
+      a.post2(1);
+      testCase.verifyFalse(g.Node.CurrValue, ...
+        'comparison must update to false');
+    end
+
+    function test_map_with_binary_function_errors(testCase)
+      % a.map(@plus) is a nonsense call. The reference map.m calls f(wv)
+      % with one argument so plus fails with not enough input arguments.
+      % The op code sanitiser keeps such nodes on the generic path so
+      % this behaviour is unchanged.
+      a = testCase.A;
+      m = a.map(@plus);
+
+      testCase.verifyError(@() a.post2(5), 'MATLAB:minrhs');
+    end
+
     %% buffer Tests
     function test_buffer_basic(testCase)
       % Test buffer accumulates values into an array

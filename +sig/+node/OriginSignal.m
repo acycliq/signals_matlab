@@ -83,8 +83,55 @@ classdef OriginSignal < sig.node.Signal
             qIdx = qIdx + 1;
             curr.queued = false;
 
-            % Just call the transfer function, it checks if inputs are ready
-            computed = curr.transferMethodHandle();
+            % network.c transfer() L719-773: binary ops on two double
+            % scalars are computed inline without the generic mapn
+            % machinery. The inline operator is the very same builtin that
+            % mapn reaches through its function handle, so the results are
+            % identical, and everything else (vectors, ints, missing
+            % values) falls through to the transfer method, error paths
+            % included. The op code sanitiser in the Node constructor
+            % guarantees codes 1-19 only sit on two input mapn nodes.
+            op = curr.opCode;
+            if op ~= 0 && op < 20
+                ins = curr.Inputs;
+                nIn1 = ins(1); nIn2 = ins(2);
+                l = nIn1.workingValue;
+                r = nIn2.workingValue;
+                lNew = ~isa(l, 'sig.Nil');
+                rNew = ~isa(r, 'sig.Nil');
+                if lNew || rNew                        % ANY_NEW_INPUT_OF_2, network.c L691
+                    if ~lNew, l = nIn1.CurrValue; end  % LATEST_VALUE, network.c L689
+                    if ~rNew, r = nIn2.CurrValue; end
+                    if ~isa(l, 'sig.Nil') && ~isa(r, 'sig.Nil')
+                        if isa(l, 'double') && isscalar(l) ...
+                            && isa(r, 'double') && isscalar(r)
+                            switch op
+                                case 1,     curr.workingValue = l + r;
+                                case 2,     curr.workingValue = l - r;
+                                case {3,4}, curr.workingValue = l * r;
+                                case {5,6}, curr.workingValue = l / r;
+                                case 10,    curr.workingValue = l > r;
+                                case 11,    curr.workingValue = l >= r;
+                                case 12,    curr.workingValue = l < r;
+                                case 13,    curr.workingValue = l <= r;
+                                otherwise,  curr.workingValue = l == r; % 14
+                            end
+                            computed = true;
+                        else
+                            % not two double scalars, generic transfer
+                            % like the C does (network.c L767-769)
+                            computed = curr.transferMethodHandle();
+                        end
+                    else
+                        computed = false; % an input has no value at all
+                    end
+                else
+                    computed = false; % nothing new on either input
+                end
+            else
+                % Just call the transfer function, it checks if inputs are ready
+                computed = curr.transferMethodHandle();
+            end
 
             % MEX network.c L701-708: the transfer set no output, but this
             % node was given a working value earlier in this transaction.

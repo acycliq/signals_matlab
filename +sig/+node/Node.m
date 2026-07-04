@@ -16,6 +16,7 @@ classdef Node < handle
                          % Its role is to prevents duplicate queuing during signal propagation
     Targets % will keep the input nodes (aka children)
     EventTarget % Signal to notify on value commit (replaces MEX eventsTarget)
+    opCode = 0 % transferer op code for the post2 dispatch, mirrors network.c transfer() (0 = generic)
   end
   
   properties (SetAccess = immutable)
@@ -63,6 +64,27 @@ classdef Node < handle
         appendValues = false;
       end
       opCode = sig.node.transfererOpCode(transFun, transArg);
+      % mapn wraps its function as a {f, outIdx} cell, so transfererOpCode
+      % always returns 0 for it and the binary op codes (network.c
+      % transfer() L729-758) never reached the nodes they were written
+      % for. Unwrap the cell to detect them. Only for output index 1,
+      % the dispatch assigns the single return value.
+      if opCode == 0 && strcmp(transFun, 'sig.transfer.mapn') ...
+          && iscell(transArg) && numel(transArg) == 2 ...
+          && isequal(transArg{2}, 1) && isa(transArg{1}, 'function_handle')
+        opCode = sig.node.transfererOpCode(transFun, transArg{1});
+      end
+      % Binary op codes are only meaningful on a two input mapn node.
+      % transfererOpCode's bare handle rule also matches map, so a call
+      % like a.map(@plus) would carry the plus code on a one input node.
+      % In MEX that makes transfer() read inputs[1] past the end of the
+      % array (network.c L691). Zero the code instead, such nodes always
+      % take the generic transfer method.
+      if opCode > 0 && opCode < 20 ...
+          && ~(strcmp(transFun, 'sig.transfer.mapn') && numel(this.Inputs) == 2)
+        opCode = 0;
+      end
+      this.opCode = opCode;
       this.NetListeners = event.listener(this.Net, 'Deleting', @this.netDeleted);
       this.transFun = transFun;
       this.transArg = transArg;
