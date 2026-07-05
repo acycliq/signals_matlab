@@ -560,7 +560,7 @@ classdef Signal < sig.Signal & handle
       h = onValue(this, @disp);
     end
     
-    function varargout = size_ZZZ(varargin)
+    function varargout = size(varargin)
       % [sz1,...,szN] = size(x) or szdim = size(x,dim) returns the size of
       % signal x, optionally over dimension dim.
       if nargout > 1
