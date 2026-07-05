@@ -281,14 +281,17 @@ classdef Node < handle
         end
     end
 
-    function transact(this, value)
+    function affectedIds = transact(this, value)
         % Run one full transaction starting from this node: set the
         % working value, propagate breadth first through the targets, then
         % apply the working values and notify event targets. Named after
         % the C function it replicates (network.c transact, L659-687, plus
         % sqApply, L339-400). Callers: OriginSignal.post2 for ordinary
         % posts, Net.runSchedule for delayed deliveries, both of which the
-        % MEX served through the submit + applyNodes pair.
+        % MEX served through the submit + applyNodes pair, and the
+        % mexcompat submit adapter, which is the only caller that asks for
+        % the affected ids (a column in propagation order, duplicates
+        % included, exactly what sqTransact returned, network.c L329-335).
 
         % Set working value on the starting node, direct property write
         % to avoid method call overhead in this hot path.
@@ -424,6 +427,15 @@ classdef Node < handle
             % Notify event target after commit (matches MEX network.c L378-381)
             if ~isempty(node.EventTarget)
                 node.EventTarget.valueChanged(node.currValue);
+            end
+        end
+
+        if nargout
+            % assemble the affected ids the way sqTransact returned them,
+            % only the mexcompat submit adapter ever asks for this
+            affectedIds = zeros(nAffected, 1);
+            for i = 1:nAffected
+                affectedIds(i) = affected{i}.Id;
             end
         end
     end

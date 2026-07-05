@@ -72,8 +72,27 @@ classdef Net < handle
     end
 
     function Id = createNetwork(this, size)
-        Id = 1;
+        % Allocate the first free network slot and register this net so
+        % it can be found by id, the same bookkeeping the C kept in its
+        % networks[MAX_NETWORKS] table (network.c L7, L632-639, ids are
+        % 0 based and at most 10 networks exist at once)
+        reg = sig.Net.registry();
+        Id = [];
+        for slot = 0:9
+            if ~isKey(reg, slot) || ~isvalid(reg(slot))
+                Id = slot;
+                break
+            end
+        end
+        % The C returns -1 when full and lets the caller fail downstream,
+        % we fail loudly here instead, a deliberate and documented
+        % deviation, silent -1 ids helped nobody in fifteen years
+        assert(~isempty(Id), 'sig:Net:full', ...
+            'No free network slots, at most 10 networks can exist at once');
         this.nodes = cell(1, size);
+        % register LAST, like the C sets active = TRUE as its final step
+        % (network.c L62), so the net is only resolvable once fully built
+        reg(Id) = this; %#ok<NASGU> handle map, updates the shared registry
     end
     
     function nodeId = addNode(this, newNode)
@@ -228,6 +247,14 @@ classdef Net < handle
       disp('**net.delete**');
       if ~isempty(this.Id)
         fprintf('deleting network with id: %d \n' , this.Id)
+        % free the slot BEFORE tearing down, like the C which sets the
+        % network inactive first "for safety (possible reentrancy)"
+        % (network.c L72), so nothing can resolve this net by id while
+        % its nodes are being destroyed
+        reg = sig.Net.registry();
+        if isKey(reg, this.Id)
+          remove(reg, this.Id);
+        end
         notify(this, 'Deleting');
         this.nodes = [];
       end
@@ -239,6 +266,28 @@ classdef Net < handle
     end
   end
   
+  methods (Static)
+    function map = registry()
+      % The table of live networks by id, the pure equivalent of the C's
+      % global networks[MAX_NETWORKS] array (network.c L47). Shared
+      % handle, callers mutate it in place.
+      persistent reg
+      if isempty(reg)
+        reg = containers.Map('KeyType', 'double', 'ValueType', 'any');
+      end
+      map = reg;
+    end
+
+    function net = byId(id)
+      % Resolve a network id to the live sig.Net, used by the mexcompat
+      % adapters that serve the old submit/applyNodes call signatures
+      reg = sig.Net.registry();
+      assert(isKey(reg, id) && isvalid(reg(id)), 'sig:Net:invalidId', ...
+        '%d is not a valid network id', id);
+      net = reg(id);
+    end
+  end
+
   methods (Access = protected)
 %     function mexNetworkDeleted(this)
 %       fprintf('network #%i''s storage deleted\n', this.Id);
