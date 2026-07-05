@@ -1323,6 +1323,58 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       testCase.verifyEqual(acc.Node.CurrValue, 'start_1_2_3');
     end
 
+    %% mexnet compatibility adapter (mexcompat/, network registry)
+    function test_net_registry(testCase)
+      % Nets take the first free slot 0-9 like the C's networks table,
+      % byId resolves them, and deleting frees the slot for reuse
+      n1 = sig.Net(10);
+      n2 = sig.Net(10);
+      testCase.verifyNotEqual(n1.Id, n2.Id, ...
+        'two live nets must have distinct ids');
+      testCase.verifyTrue(sig.Net.byId(n1.Id) == n1, ...
+        'byId must resolve to the same handle');
+      testCase.verifyTrue(sig.Net.byId(n2.Id) == n2);
+
+      freed = n2.Id;
+      delete(n2);
+      n3 = sig.Net(10);
+      testCase.verifyEqual(n3.Id, freed, ...
+        'a deleted net''s slot must be reused');
+      testCase.verifyError(@() sig.Net.byId(99), 'sig:Net:invalidId');
+      delete(n1);
+      delete(n3);
+    end
+
+    function test_submit_applyNodes_adapter(testCase)
+      % The exact call pattern of Rigbox exp.SignalsExp/quit: force a
+      % value into a DERIVED node with submit, then call applyNodes with
+      % the returned ids. The fused adapter must deliver the value,
+      % propagate it, fire events once, and keep applyNodes harmless.
+      net = testCase.net;
+      a = net.origin('a');
+      stop = a.map(@(x) x); % a derived node, like events.expStop
+      seen = 0;
+      lh = stop.onValue(@count);
+
+      affectedIdxs = submit(net.Id, stop.Node.Id, true);
+      testCase.verifyEqual(stop.Node.CurrValue, true, ...
+        'submit must deliver the value into the derived node');
+      testCase.verifyEqual(affectedIdxs(1), stop.Node.Id, ...
+        'affected ids must start with the submitted node, like sqTransact');
+      testCase.verifyEqual(seen, 1, 'the event must fire once');
+
+      applyNodes(net.Id, affectedIdxs); % must be a harmless no-op
+      testCase.verifyEqual(seen, 1, ...
+        'applyNodes must not fire events again');
+
+      testCase.verifyError(@() submit(99, 1, true), 'sig:Net:invalidId');
+      delete(lh);
+
+      function count(~)
+        seen = seen + 1;
+      end
+    end
+
     %% post() Tests (the public API, wired to the pure engine)
     function test_post_full_pipeline(testCase)
       % post() is the public entry point every experiment uses. It now
