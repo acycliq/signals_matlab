@@ -53,7 +53,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
 
       a.post2(5);
 
-      testCase.verifyTrue(c.Node.CurrValue == sig.Nil.instance(), ...
+      testCase.verifyEmpty(c.Node.CurrValue, ...
         'mapn should not compute with partial inputs');
 
       b.post2(3);
@@ -295,7 +295,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       clickedPos = pos.at(click);
 
       pos.post2(100);
-      testCase.verifyTrue(clickedPos.Node.CurrValue == sig.Nil.instance(), ...
+      testCase.verifyEmpty(clickedPos.Node.CurrValue, ...
         'at should not fire until when is true');
 
       click.post2(true);
@@ -322,11 +322,11 @@ classdef Signals_post2_test < matlab.unittest.TestCase
 
       pos.post2(100);
       click.post2(false);  % false - should not trigger
-      testCase.verifyTrue(clickedPos.Node.CurrValue == sig.Nil.instance(), ...
+      testCase.verifyEmpty(clickedPos.Node.CurrValue, ...
         'at should not fire when when is false');
 
       click.post2(0);  % also false
-      testCase.verifyTrue(clickedPos.Node.CurrValue == sig.Nil.instance(), ...
+      testCase.verifyEmpty(clickedPos.Node.CurrValue, ...
         'at should not fire when when is 0');
     end
 
@@ -353,7 +353,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
 
       % click fires but pos was never set
       click.post2(true);
-      testCase.verifyTrue(clickedPos.Node.CurrValue == sig.Nil.instance(), ...
+      testCase.verifyEmpty(clickedPos.Node.CurrValue, ...
         'at should not fire if what has no value');
     end
 
@@ -885,11 +885,10 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       % Value is blocked when gate is false
       [a, b] = deal(testCase.A, testCase.B);
       k = a.keepWhen(b);
-      nilInstance = sig.Nil.instance();
 
       b.post2(false);
       a.post2(42);
-      testCase.verifyTrue(k.Node.CurrValue == nilInstance, ...
+      testCase.verifyEmpty(k.Node.CurrValue, ...
         'keepWhen should block value when gate is false');
     end
 
@@ -919,8 +918,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       b.post2(true);
       % 'a' was posted in a previous transaction, so it has currValue but
       % no workingValue in this transaction. keepWhen should NOT pass it.
-      nilInstance = sig.Nil.instance();
-      testCase.verifyTrue(k.Node.CurrValue == nilInstance, ...
+      testCase.verifyEmpty(k.Node.CurrValue, ...
         'keepWhen should not fall back to current value of what');
     end
 
@@ -928,11 +926,10 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       % When gate has no value at all, nothing passes
       [a, b] = deal(testCase.A, testCase.B);
       k = a.keepWhen(b);
-      nilInstance = sig.Nil.instance();
 
       % Only post to 'what', gate never set
       a.post2(42);
-      testCase.verifyTrue(k.Node.CurrValue == nilInstance, ...
+      testCase.verifyEmpty(k.Node.CurrValue, ...
         'keepWhen should not pass when gate has no value');
     end
 
@@ -1410,10 +1407,10 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       b = a.buffer(3);
 
       a.post2(5);
-      testCase.verifyTrue(b.Node.CurrValue == sig.Nil.instance(), ...
+      testCase.verifyEmpty(b.Node.CurrValue, ...
         'buffer must stay unset while under n updates');
       a.post2(1);
-      testCase.verifyTrue(b.Node.CurrValue == sig.Nil.instance(), ...
+      testCase.verifyEmpty(b.Node.CurrValue, ...
         'buffer must stay unset at n-1 updates');
 
       a.post2(2);
@@ -1431,7 +1428,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       d = a.delta();
 
       a.post2(10);
-      testCase.verifyTrue(d.Node.CurrValue == sig.Nil.instance(), ...
+      testCase.verifyEmpty(d.Node.CurrValue, ...
         'delta needs two values');
 
       a.post2(15);
@@ -1448,7 +1445,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
 
       a.post2(1);
       a.post2(2);
-      testCase.verifyTrue(l.Node.CurrValue == sig.Nil.instance(), ...
+      testCase.verifyEmpty(l.Node.CurrValue, ...
         'lag must stay unset until the buffer fills');
 
       a.post2(3);
@@ -1803,7 +1800,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       a.post2(7);
 
       net.runSchedule();
-      testCase.verifyTrue(d.Node.CurrValue == sig.Nil.instance(), ...
+      testCase.verifyEmpty(d.Node.CurrValue, ...
         'future task must not be delivered');
       testCase.verifyEqual(numel(net.Schedule), 1, ...
         'future task must stay in the schedule');
@@ -1846,7 +1843,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
 
       net.runSchedule();  % delivers d, which schedules e's packet
       testCase.verifyEqual(d.Node.CurrValue, 5);
-      testCase.verifyTrue(e.Node.CurrValue == sig.Nil.instance(), ...
+      testCase.verifyEmpty(e.Node.CurrValue, ...
         'task scheduled during delivery must wait for the next call');
       testCase.verifyEqual(numel(net.Schedule), 1);
 
@@ -1883,7 +1880,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
 
       % Post to c first — b should not update (a hasn't fired)
       c.post2(1:3);
-      testCase.verifyTrue(b.Node.CurrValue == sig.Nil.instance(), ...
+      testCase.verifyEmpty(b.Node.CurrValue, ...
         'map(signal) should not update until source signal updates');
 
       % Post to a — b should take c's current value
@@ -1901,7 +1898,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
 
       % No updates until n samples defined
       a.post2(1);
-      testCase.verifyTrue(buff.Node.CurrValue == sig.Nil.instance(), ...
+      testCase.verifyEmpty(buff.Node.CurrValue, ...
         'bufferUpTo(signal) should not update before N is set');
 
       % Set N then fill buffer
@@ -1945,7 +1942,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       % Post value to a (what) — s should not update
       v = 42;
       a.post2(v);
-      testCase.verifyTrue(s.Node.CurrValue == sig.Nil.instance(), ...
+      testCase.verifyEmpty(s.Node.CurrValue, ...
         'then should not update when only what is posted');
 
       % Post true to b (when) — s should sample a's current value
@@ -2146,7 +2143,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       c.post2(200);
       a.post2(5);
 
-      testCase.verifyTrue(s.Node.CurrValue == sig.Nil.instance(), ...
+      testCase.verifyEmpty(s.Node.CurrValue, ...
         'out-of-range idx should not emit');
     end
 
@@ -2158,7 +2155,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       b.post2(100);
       c.post2(200);
 
-      testCase.verifyTrue(s.Node.CurrValue == sig.Nil.instance(), ...
+      testCase.verifyEmpty(s.Node.CurrValue, ...
         'no indexer value should not emit');
     end
 
@@ -2171,7 +2168,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       b.post2(100);
       a.post2(2);
 
-      testCase.verifyTrue(s.Node.CurrValue == sig.Nil.instance(), ...
+      testCase.verifyEmpty(s.Node.CurrValue, ...
         'idx pointing to unset option should not emit');
     end
 
@@ -2312,7 +2309,7 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       a.post2([10 20 30]);
       % b never posted
 
-      testCase.verifyTrue(s.Node.CurrValue == sig.Nil.instance(), ...
+      testCase.verifyEmpty(s.Node.CurrValue, ...
         'should not emit when subscript has no value');
     end
 
