@@ -1356,6 +1356,26 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       end
     end
 
+    %% size overload Tests
+    function test_size_returns_signal(testCase)
+      % size on a signal is overloaded to return a SIGNAL carrying the
+      % size, built through map/mapn. It was parked as size_ZZZ during
+      % development (commit 5336034, the MATLAB desktop calls size on
+      % variables constantly and every call creates nodes) and reinstated
+      % for master fidelity, the old suite's test_size guards it too.
+      a = testCase.A;
+      s = size(a);
+      testCase.verifyTrue(isa(s, 'sig.node.Signal'), ...
+        'size of a signal must return a signal');
+
+      a.post2([1 2 3]);
+      testCase.verifyEqual(s.Node.CurrValue, [1 3], ...
+        'the size signal must carry the size of the value');
+
+      a.post2(zeros(2, 5));
+      testCase.verifyEqual(s.Node.CurrValue, [2 5]);
+    end
+
     %% flattenStruct Tests (no MATLAB reference, the spec is network.c L852-899)
     function test_flattenStruct_fresh_blueprint_emits_empties(testCase)
       % A fresh blueprint emits the non-signal fields and EMPTY signal
