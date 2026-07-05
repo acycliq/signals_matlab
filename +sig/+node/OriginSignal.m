@@ -38,10 +38,9 @@ classdef OriginSignal < sig.node.Signal
       %
       % See also delayedPost
       
-      % an array containing the network indices of the signals which will
-      % be affected as a result of this post
-      affectedIdxs = submit(this.Node.NetId, this.Node.Id, v);
-      applyNodes(this.Node.NetId, affectedIdxs);
+      % The pure engine runs the whole transaction, propagate then apply,
+      % the same operation the mex submit + applyNodes pair performed
+      this.Node.transact(v);
     end
 
     function post2(this, value)
