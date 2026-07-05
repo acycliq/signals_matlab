@@ -1326,6 +1326,36 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       testCase.verifyEqual(acc.Node.CurrValue, 'start_1_2_3');
     end
 
+    %% post() Tests (the public API, wired to the pure engine)
+    function test_post_full_pipeline(testCase)
+      % post() is the public entry point every experiment uses. It now
+      % runs Node.transact, the same transaction post2 runs, no mex.
+      % This is the first test post() can pass on this branch, before the
+      % flip it required a mex network that the pure Net never creates.
+      [a, b] = deal(testCase.A, testCase.B);
+      c = a + b;
+      seen = [];
+      lh = c.onValue(@remember);
+
+      a.post(1);   % c cannot compute yet, b has no value
+      b.post(2);
+      testCase.verifyEqual(c.Node.CurrValue, 3, ...
+        'post must propagate through the pure engine');
+
+      a.post(10);
+      testCase.verifyEqual(c.Node.CurrValue, 12, ...
+        'repeated posts must keep propagating');
+
+      testCase.verifyEqual(seen, [3 12], ...
+        'events must fire once per commit through post');
+
+      delete(lh);  % unsubscribe while everything is alive
+
+      function remember(v)
+        seen = [seen v];
+      end
+    end
+
     %% flattenStruct Tests (no MATLAB reference, the spec is network.c L852-899)
     function test_flattenStruct_fresh_blueprint_emits_empties(testCase)
       % A fresh blueprint emits the non-signal fields and EMPTY signal
