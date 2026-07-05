@@ -1376,6 +1376,120 @@ classdef Signals_post2_test < matlab.unittest.TestCase
       testCase.verifyEqual(s.Node.CurrValue, [2 5]);
     end
 
+    function test_size_forms(testCase)
+      % The remaining call shapes from the original test_size: two
+      % outputs, a dim argument, and the error when outputs and dims
+      % disagree (Name checks skipped per our policy)
+      a = testCase.A;
+
+      [m, n] = size(a);
+      a.post2(1:4);
+      testCase.verifyEqual([m.Node.CurrValue, n.Node.CurrValue], [1 4], ...
+        'two output size must give one signal per dimension');
+
+      s2 = size(a, 2);
+      a.post2(1:7);
+      testCase.verifyEqual(s2.Node.CurrValue, 7, ...
+        'size with a dim argument must give that dimension');
+
+      [~, bad] = size(a, 2); %#ok<ASGLU>
+      id = iff(verLessThan('matlab', '9.7'), ...
+        'MATLAB:maxlhs', 'MATLAB:size:NumOutNotEqualNumDims');
+      testCase.verifyError(@() a.post2(1:3), id, ...
+        'two outputs with a dim argument must error like plain size');
+    end
+
+    %% Composite methods built on buffer (buffer, delta, lag, setEpochTrigger)
+    % This whole family was silently dead while the size overload was
+    % parked as size_ZZZ (buffer gates on size(bufferUpTo, 2) being a
+    % signal). The old suite caught it, these tests keep it caught.
+    function test_buffer_composite(testCase)
+      % Signal.buffer(n), unlike bufferUpTo, stays silent until the
+      % input has updated n times, then holds the last n values
+      a = testCase.A;
+      b = a.buffer(3);
+
+      a.post2(5);
+      testCase.verifyTrue(b.Node.CurrValue == sig.Nil.instance(), ...
+        'buffer must stay unset while under n updates');
+      a.post2(1);
+      testCase.verifyTrue(b.Node.CurrValue == sig.Nil.instance(), ...
+        'buffer must stay unset at n-1 updates');
+
+      a.post2(2);
+      testCase.verifyEqual(b.Node.CurrValue, [5 1 2], ...
+        'buffer must emit once filled to n');
+
+      a.post2(3);
+      testCase.verifyEqual(b.Node.CurrValue, [1 2 3], ...
+        'buffer must roll oldest out');
+    end
+
+    function test_delta(testCase)
+      % delta is diff over a 2-buffer, needs two updates to fire
+      a = testCase.A;
+      d = a.delta();
+
+      a.post2(10);
+      testCase.verifyTrue(d.Node.CurrValue == sig.Nil.instance(), ...
+        'delta needs two values');
+
+      a.post2(15);
+      testCase.verifyEqual(d.Node.CurrValue, 5);
+
+      a.post2(12);
+      testCase.verifyEqual(d.Node.CurrValue, -3);
+    end
+
+    function test_lag(testCase)
+      % lag(n) is the first element of an n+1 buffer
+      a = testCase.A;
+      l = a.lag(2);
+
+      a.post2(1);
+      a.post2(2);
+      testCase.verifyTrue(l.Node.CurrValue == sig.Nil.instance(), ...
+        'lag must stay unset until the buffer fills');
+
+      a.post2(3);
+      testCase.verifyEqual(l.Node.CurrValue, 1, ...
+        'lag(2) must give the value from two updates ago');
+
+      a.post2(4);
+      testCase.verifyEqual(l.Node.CurrValue, 2);
+    end
+
+    function test_setEpochTrigger(testCase)
+      % The original test_setEpochTrigger scenario, minus its direct mex
+      % lines and Name check: arm a period, move x a little, let the
+      % clock pass the period, the trigger must release to true and
+      % re-arming the period must not fire the trigger again
+      [t, dt, x] = deal(testCase.A, testCase.B, testCase.C);
+      tr = setEpochTrigger(t, dt, x);
+
+      testCase.verifyFalse(tr.Node.CurrValue, ...
+        'trigger must initialise to false');
+
+      t.post2(5);       % arm with a 5 unit period
+      x.post2(.1);
+      x.post2(.2);      % small movements, below default threshold reset
+      dt.post2(0);
+      dt.post2(6);      % clock passes the period
+      testCase.verifyTrue(tr.Node.CurrValue, ...
+        'trigger must release when x stays quiet past the period');
+
+      count = 0;
+      lh = tr.onValue(@bump);
+      t.post2(5);       % re-arm the period
+      testCase.verifyEqual(count, 0, ...
+        're-arming must not update the trigger');
+      delete(lh);
+
+      function bump(~)
+        count = count + 1;
+      end
+    end
+
     %% flattenStruct Tests (no MATLAB reference, the spec is network.c L852-899)
     function test_flattenStruct_fresh_blueprint_emits_empties(testCase)
       % A fresh blueprint emits the non-signal fields and EMPTY signal
