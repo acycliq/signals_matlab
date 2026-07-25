@@ -14,6 +14,9 @@ uses the old call signatures. The only known runtime caller is Rigbox:
 `exp.SignalsExp/quit` stops an experiment with a `submit` followed by an
 `applyNodes` (Rigbox `+exp/SignalsExp.m`, around line 451).
 
+`networkInfo` is here for the same reason: the tutorials and Rigbox docs
+call it by its old mex signature to inspect nets and nodes.
+
 ## How it works
 
 `submit` resolves the network through `sig.Net.byId` (nets register in
