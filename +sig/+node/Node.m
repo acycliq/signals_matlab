@@ -182,7 +182,7 @@ classdef Node < handle
     
     function delete(this)
       if ~isempty(this.Id)
-        fprintf('Deleting node ''%s''\n', this.Name);
+%         fprintf('Deleting node ''%s''\n', this.Name);
         this.Net.nodes{this.Id} = [];
       end
     end
