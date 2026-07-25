@@ -34,11 +34,11 @@ classdef Node < handle
     Inputs sig.node.Node % Array of input nodes (private so only setInputs can rewire)
   end
   
-  properties (SetAccess = private, Transient)
-    NetId double
-  end
-  
   properties (Dependent)
+    % Id of the parent network. No longer stored, the getter reads it
+    % from the parent net. Kept for backwards compatibility, code outside
+    % this repo reads node.NetId (for example Rigbox SignalsExpTest).
+    NetId
     Name
     CurrValue
     CurrValueSet
@@ -62,7 +62,6 @@ classdef Node < handle
         assert(numel(this.Net) == 1);
       end
       this.DisplayInputs = this.Inputs;
-      this.NetId = this.Net.Id;
       inputids = [this.Inputs.Id];
       if nargin < 2
         transFun = 'sig.transfer.nop';
@@ -130,6 +129,10 @@ classdef Node < handle
       end
     end
     
+    function id = get.NetId(this)
+      id = this.Net.Id;
+    end
+
     function v = get.Name(this)
       if ~isempty(this.NameOverride)
         v = this.NameOverride;

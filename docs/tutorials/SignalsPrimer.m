@@ -23,7 +23,7 @@
 % * Net: a handle to the parent network (a sig.Net object)
 % * Inputs: an array of input nodes (other sig.node.Node objects)
 % * Id: an integer node ID used by the low level C code
-% * NetId: an integer ID for the parent network, used by the low level C code
+% * NetId: an integer ID for the parent network, kept for backwards compatibility
 % * CurrValue: the current value that the node holds
 
 net = sig.Net; % Create a new signals network
