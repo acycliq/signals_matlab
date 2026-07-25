@@ -52,7 +52,7 @@ classdef Node < handle
   end
   
   methods
-    function this = Node(srcs, transFun, transArg, appendValues)
+    function this = Node(srcs, transFun, transArg)
       if isa(srcs, 'sig.Net')
         this.Net = srcs;
         this.Inputs = sig.node.Node.empty;
@@ -69,9 +69,6 @@ classdef Node < handle
       end
       if nargin < 3
         transArg = [];
-      end
-      if nargin < 4
-        appendValues = false;
       end
       opCode = sig.node.transfererOpCode(transFun, transArg);
       % mapn wraps its function as a {f, outIdx} cell, so transfererOpCode
