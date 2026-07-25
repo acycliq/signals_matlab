@@ -62,7 +62,6 @@ classdef Node < handle
         assert(numel(this.Net) == 1);
       end
       this.DisplayInputs = this.Inputs;
-      inputids = [this.Inputs.Id];
       if nargin < 2
         transFun = 'sig.transfer.nop';
       end
