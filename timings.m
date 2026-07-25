@@ -20,7 +20,7 @@ function timings()
 
     clearvars -except te_post2 nIters name2
 
-    name = 'post (mexnet)';
+    name = 'post (plain matlab)';
     t0 = tic;
     for i = 1:nIters
         net = sig.Net();
