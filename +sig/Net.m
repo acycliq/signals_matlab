@@ -246,7 +246,8 @@ classdef Net < handle
     function delete(this)
       disp('**net.delete**');
       if ~isempty(this.Id)
-        fprintf('deleting network with id: %d \n' , this.Id)
+        % same message the mex printed on deletion (network.c L71)
+        fprintf('Deleting net(%d)\n', this.Id)
         % free the slot BEFORE tearing down, like the C which sets the
         % network inactive first "for safety (possible reentrancy)"
         % (network.c L72), so nothing can resolve this net by id while
