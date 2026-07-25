@@ -338,7 +338,7 @@ classdef Node < handle
             % included. The op code sanitiser in the Node constructor
             % guarantees codes 1-19 only sit on two input mapn nodes.
             op = curr.opCode;
-            if op ~= 0 && op < 20
+            if op > 0 && op < 20
                 ins = curr.Inputs;
                 nIn1 = ins(1); nIn2 = ins(2);
                 l = nIn1.workingValue;
