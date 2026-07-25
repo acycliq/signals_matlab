@@ -297,10 +297,12 @@ classdef Node < handle
         this.workingValue = value;
 
         % Preallocate queue and affected list like MEX network.c L663-664
-        % (QUEUE_ALLOC/STACK_ALLOC of nNodes). The queue can never exceed
-        % nNodes since the queued flag stops duplicates. The affected list
-        % can (nodes computed twice in one transaction), MATLAB just grows
-        % the cell in that rare case.
+        % (QUEUE_ALLOC/STACK_ALLOC of nNodes). The queued flag caps how
+        % many nodes wait in the queue at once, but both arrays can still
+        % grow past nNodes in one transaction (a node can be re-queued
+        % and recomputed after a second wave reaches it), MATLAB just
+        % grows the cell in that rare case. The C queue wrapped around
+        % instead (circular buffer).
         nNodes = numel(this.Net.nodes);
         queue = cell(1, nNodes);
         affected = cell(1, nNodes);
